@@ -89,6 +89,14 @@ def hil_approvers() -> List[str]:
     return [a.strip().lower() for a in raw.split(",") if a.strip()]
 
 
+def hil_overdue_days() -> float:
+    """A case waiting longer than this is flagged overdue in HIL History."""
+    try:
+        return float(os.environ.get("SENTINEL_HIL_OVERDUE_DAYS", "7"))
+    except ValueError:
+        return 7.0
+
+
 def public_url() -> str:
     return os.environ.get("SENTINEL_PUBLIC_URL", f"http://localhost:{port()}").rstrip("/")
 
@@ -116,6 +124,31 @@ def credentials() -> Dict[str, str]:
     """Single login. No password configured = UI disabled (health only)."""
     return {"user": os.environ.get("SENTINEL_USER", "admin"),
             "password": os.environ.get("SENTINEL_PASSWORD", "")}
+
+
+def db_mode() -> str:
+    """SENTINEL_DB=postgres uses PostgreSQL (POSTGRES_* settings, schema
+    SENTINEL_DB_SCHEMA); anything else is a local SQLite file (zero setup)."""
+    return "postgres" if os.environ.get("SENTINEL_DB", "sqlite").strip().lower() in ("postgres", "postgresql") else "sqlite"
+
+
+def postgres() -> Dict[str, Any]:
+    return {"host": os.environ.get("POSTGRES_HOST", "localhost"), "port": int(os.environ.get("POSTGRES_PORT", "5432")),
+            "user": os.environ.get("POSTGRES_USER", "postgres"), "database": os.environ.get("POSTGRES_DB", "k9x"),
+            "schema": db_schema()}
+
+
+def db_schema() -> str:
+    return os.environ.get("SENTINEL_DB_SCHEMA", "k9sentinel").strip() or "k9sentinel"
+
+
+def database_url() -> str:
+    if db_mode() == "postgres":
+        from sqlalchemy.engine import URL
+        pg = postgres()
+        return URL.create("postgresql+psycopg2", username=pg["user"], password=os.environ.get("POSTGRES_PASSWORD", ""),
+                          host=pg["host"], port=pg["port"], database=pg["database"]).render_as_string(hide_password=False)
+    return f"sqlite:///{db_path()}"
 
 
 def db_path() -> Path:

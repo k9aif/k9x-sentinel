@@ -46,6 +46,15 @@
   .prose li { margin-bottom:8px; }
   code { font-size:12.5px; }
   #detail { margin-top:16px; }
+  .hilbar { display:flex; align-items:center; gap:8px; margin:0 0 10px; flex-wrap:wrap; }
+  .hilbar .spacer { flex:1; }
+  tr.overdue td { background:color-mix(in srgb, var(--gap) 9%, transparent); }
+  .tl { list-style:none; padding:0; margin:8px 0 0; border-left:2px solid var(--line); }
+  .tl li { position:relative; padding:4px 0 8px 16px; font-size:13px; }
+  .tl li::before { content:""; position:absolute; left:-6px; top:9px; width:10px; height:10px; border-radius:50%; background:var(--accent); }
+  .tl .when { color:var(--mute); font-size:12px; margin-right:8px; }
+  .tl .ev { font-weight:600; }
+  .tl .det { color:var(--mute); display:block; word-break:break-word; }
   /* ── live run ── */
   #live { margin-bottom:16px; padding:14px 16px; }
   #live .head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
@@ -74,6 +83,14 @@
   .chip.ok { color:var(--covered); border-color:color-mix(in srgb, var(--covered) 60%, transparent); }
   .chip.error { color:var(--gap); border-color:color-mix(in srgb, var(--gap) 60%, transparent); }
   @keyframes blink { 50% { opacity:.45; } }
+  .chip { cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .chip.hit { border-color:var(--gap); color:var(--ink); }
+  .chip.sel { box-shadow:0 0 0 2px var(--accent); }
+  .badge { font-size:10.5px; font-weight:700; padding:0 6px; border-radius:8px; line-height:16px; }
+  .badge.new { background:color-mix(in srgb, var(--mute) 22%, transparent); color:var(--ink); }
+  .badge.gap { background:var(--gap); color:#fff; }
+  .badge.partial { background:var(--partial); color:#111; }
+  .badge.raised { background:var(--accent); color:#fff; }
   .console { height:210px; overflow-y:auto; background:#0b0d14; color:#cfd6e6; border-radius:8px; padding:8px 10px;
              font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .console .t { color:#6b7489; margin-right:8px; }
@@ -94,7 +111,7 @@
   <img src="/logo.svg" alt="" width="30" height="34">
   <h1>K9X Sentinel</h1>
   <span class="sub">threat watch for the K9-AIF framework</span>
-  <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="architecture">Architecture</button><a class="navlink" href="/about">About</a></nav>
+  <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="hil">HIL History</button><button data-view="architecture">Architecture</button><a class="navlink" href="/about">About</a></nav>
   <span class="spacer"></span>
   <span id="runstate" class="mute"></span>
   <button id="runbtn" class="primary">Run now</button>
@@ -117,6 +134,20 @@
   </table></div>
   <div id="detail" class="card" hidden></div>
   <p class="note">Private. Findings describe gaps that may not be fixed yet: never expose this UI publicly.</p>
+ </section>
+ <section id="view-hil" hidden>
+  <div class="cards" id="hilcards"></div>
+  <div class="hilbar">
+    <span class="mute" id="chain"></span><span class="spacer"></span>
+    <button id="verifybtn">Verify audit chain</button>
+    <a class="navlink" href="/api/audit.csv">Export audit CSV</a>
+  </div>
+  <div class="wrap"><table>
+    <thead><tr><th>#</th><th>Finding</th><th>Verdict</th><th>Severity</th><th>Raised</th><th>Waiting</th>
+      <th>Outcome</th><th>Decided by</th><th>Comment</th><th>GitHub</th></tr></thead>
+    <tbody id="hilrows"></tbody>
+  </table></div>
+  <p class="note">Every finding ever sent for human review, from Sentinel's append-only audit trail. A case waiting longer than the overdue limit is a governance gap: ask the reviewers why it hasn't been decided.</p>
  </section>
  <section id="view-architecture" hidden>
   <div class="wrap arch"><img src="/architecture.svg" alt="K9X Sentinel architecture: sources, the Sentinel pipeline, the K9-AIF framework, people and GitHub as horizontal lanes"></div>
@@ -164,7 +195,8 @@ async function loadStatus() {
     card("Verdicts", `<span class="gap">${v.gap || 0} gap</span> · <span class="partial">${v.partial || 0} partial</span> · <span class="covered">${v.covered || 0} covered</span>`) +
     card("Catalog", s.catalog.error ? `<span class="gap">${esc(s.catalog.error)}</span>` :
          `k9-aif ${esc(s.catalog.framework_version)} · ${esc(s.catalog.capabilities)} controls · ${esc(s.catalog.known_gaps)} known gaps<div class="note">${esc(s.catalog.origin)}</div>`) +
-    card("Pipeline", `${esc(s.settings.model)} · HIL ${s.settings.hil ? esc(s.settings.hil_detail) : "off"} · GitHub ${esc(s.settings.github_mode)}`);
+    card("Pipeline", `${esc(s.settings.model)} · HIL ${s.settings.hil ? esc(s.settings.hil_detail) : "off"} · GitHub ${esc(s.settings.github_mode)}`) +
+    card("Database", `${esc(s.database.dialect === "postgresql" ? "PostgreSQL" : "SQLite (local file)")}${s.database.schema ? " · " + esc(s.database.schema) : ""}<div class="note">${esc(s.database.where)}</div>`);
   document.getElementById("runstate").textContent = s.state.running ? `running: ${s.state.phase}${s.state.item ? " · item " + s.state.item : ""}` : "";
   document.getElementById("runbtn").disabled = s.state.running;
   if (s.state.running && document.getElementById("live").hidden && !liveTimer) { showLive(true); pollLive(); }
@@ -176,7 +208,7 @@ function drawTabs() {
 }
 
 async function loadItems() {
-  const q = new URLSearchParams(TABS[tab][1]).toString();
+  const q = new URLSearchParams({...TABS[tab][1], ...(srcFilter ? {source: srcFilter} : {})}).toString();
   const rows = await api("/api/items" + (q ? "?" + q : ""));
   document.getElementById("rows").innerHTML = rows.length ? rows.map(r => `
     <tr class="row" data-id="${r.id}">
@@ -196,6 +228,8 @@ async function showItem(id) {
     <div>${pill(it.kind === "dependency" ? "dependency" : a.verdict)} <span class="mute">${esc(it.status)}</span>
       ${it.link ? ` · <a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</div>
     <dl>
+      <dt>Published</dt><dd>${it.published ? new Date(it.published * 1000).toLocaleString() : "— (the source gives no date)"}</dd>
+      <dt>Collected</dt><dd>${new Date(it.first_seen * 1000).toLocaleString()}</dd>
       <dt>Threat</dt><dd>${esc(a.threat || "—")}</dd>
       <dt>Severity · confidence</dt><dd>${esc(a.severity || "—")} · ${esc(a.confidence ?? "—")}</dd>
       <dt>OWASP</dt><dd>${esc((a.taxonomy || []).join(", ") || "—")}</dd>
@@ -211,7 +245,9 @@ async function showItem(id) {
       <dt>Error</dt><dd>${esc(it.error || "—")}</dd>
     </dl>
     ${act && act.request ? `<div class="note">Request that would be sent (dry run):</div><pre>${esc(JSON.stringify(act.request, null, 2))}</pre>` : ""}
-    <details><summary class="mute">Text the model read</summary><pre>${esc(it.content || it.summary || "")}</pre></details>`;
+    <details><summary class="mute">Text the model read</summary><pre>${esc(it.content || it.summary || "")}</pre></details>
+    <h3 style="font-size:14px;margin:16px 0 0">Audit trail</h3><ul class="tl" id="timeline"><li class="mute">loading…</li></ul>`;
+  loadTimeline(it.id);
   box.scrollIntoView({behavior: "smooth", block: "start"});
 }
 
@@ -225,11 +261,68 @@ document.getElementById("rows").addEventListener("click", e => {
 document.getElementById("runbtn").addEventListener("click", async () => {
   try {
     await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
-    document.getElementById("console").innerHTML = ""; chipState = {};
+    document.getElementById("console").innerHTML = ""; chipState = {}; srcCount = {}; itemSource = {};
     showLive(true); pollLive();
     document.getElementById("live").scrollIntoView({behavior: "smooth", block: "start"});
   } catch (err) { document.getElementById("runstate").textContent = err.message; }
   loadStatus();
+});
+
+// ── audit + HIL history ──
+const EVENT_LABEL = {item_collected: "Collected", screened: "Screened", assessed: "Assessed", recorded_not_raised: "Recorded, not raised",
+  prefiltered: "Not relevant (pre-filter, no model call)", raised_to_hil: "Raised to human review",
+  hil_unsent: "Not sent (Kafka unavailable)", decision_received: "Decision received",
+  decision_ignored_unauthorized: "Decision ignored (not an approver)", github_action: "GitHub", assessment_failed: "Assessment failed"};
+const fmt = ts => ts ? new Date(ts * 1000).toLocaleString() : "—";
+function eventDetail(e) {
+  const d = e.detail || {};
+  switch (e.event) {
+    case "screened": return d.screened === false ? d.reason : `${d.flagged ? "flagged: " + (d.reason || "") : "clean"} · ${d.text_chars} chars · sha256 ${String(d.text_sha256 || "").slice(0, 12)}…`;
+    case "assessed": return `${d.verdict} · ${d.severity} · confidence ${d.confidence}${d.model ? " · " + d.model : ""} · k9-aif ${d.framework_version} · read sha256 ${String(d.text_sha256 || "—").slice(0, 12)}…`;
+    case "raised_to_hil": return `${d.topic} · priority ${d.priority} · case ${d.correlation_id} · detail ${d.detail_level}`;
+    case "decision_received": return `${d.outcome}${d.comment ? ': "' + d.comment + '"' : ""}`;
+    case "decision_ignored_unauthorized": return `${d.action || ""} — not in SENTINEL_HIL_APPROVERS`;
+    case "github_action": return `${d.kind} · ${d.mode}${d.url ? " · " + d.url : ""}${d.error ? " · " + d.error : ""}`;
+    case "recorded_not_raised": case "prefiltered": return d.why;
+    case "item_collected": return `${d.source} · ${d.status}`;
+    default: return Object.entries(d).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ");
+  }
+}
+async function loadTimeline(id) {
+  const evs = await api(`/api/items/${id}/audit`);
+  document.getElementById("timeline").innerHTML = evs.length ? evs.map(e => `<li><span class="when">${fmt(e.ts)}</span>
+    <span class="ev">${esc(EVENT_LABEL[e.event] || e.event)}</span>${e.actor !== "sentinel" ? ` <span class="mute">· ${esc(e.actor)}</span>` : ""}
+    <span class="det">${esc(eventDetail(e))}</span></li>`).join("") : `<li class="mute">No audit events recorded.</li>`;
+}
+async function loadHil() {
+  const {overdue_days, cases} = await api("/api/hil");
+  const n = k => cases.filter(k).length;
+  document.getElementById("hilcards").innerHTML =
+    card("Sent for review", cases.length) +
+    card("Waiting", n(c => c.waiting_days != null)) +
+    card(`Overdue (> ${overdue_days} days)`, `<span class="${n(c => c.overdue) ? "gap" : ""}">${n(c => c.overdue)}</span>`) +
+    card("Approved · rejected · expired", `${n(c => c.outcome === "approved")} · ${n(c => c.outcome === "rejected")} · ${n(c => c.outcome === "expired")}`) +
+    card("Ignored decisions", n(c => c.ignored && c.ignored.length));
+  document.getElementById("hilrows").innerHTML = cases.length ? cases.map(c => `
+    <tr class="row ${c.overdue ? "overdue" : ""}" data-id="${c.id}">
+      <td>${c.id}</td><td>${esc(c.title || "")}${c.times_raised > 1 ? ` <span class="mute">(raised ${c.times_raised}×)</span>` : ""}</td>
+      <td>${pill(c.kind === "dependency" ? "dependency" : c.verdict)}</td><td>${esc(c.severity || "—")}</td>
+      <td class="mute">${fmt(c.raised_at)}</td>
+      <td>${c.waiting_days != null ? `<span class="${c.overdue ? "gap" : ""}">${c.waiting_days} d${c.overdue ? " · overdue" : ""}</span>` : c.unsent && !c.raised_at ? '<span class="partial">not sent</span>' : "—"}</td>
+      <td>${esc(c.outcome || (c.status === "pending_hil" ? "pending" : "—"))}${c.ignored && c.ignored.length ? ` <span class="partial">(${c.ignored.length} ignored)</span>` : ""}</td>
+      <td>${esc(c.decided_by || "—")}</td><td>${esc(c.comment || "—")}</td>
+      <td>${c.github ? (c.github.url ? `<a href="${esc(c.github.url)}" target="_blank" rel="noopener noreferrer">${esc(c.github.kind)}</a>` : esc(c.github.kind + " · " + c.github.mode)) : "—"}</td>
+    </tr>`).join("") : `<tr><td colspan="10" class="mute">Nothing has been sent for review yet.</td></tr>`;
+}
+document.getElementById("hilrows").addEventListener("click", e => {
+  const tr = e.target.closest("tr.row"); if (!tr) return;
+  document.querySelector('nav.views button[data-view="findings"]').click();
+  location.hash = "item-" + tr.dataset.id;
+});
+document.getElementById("verifybtn").addEventListener("click", async () => {
+  const v = await api("/api/audit/verify");
+  document.getElementById("chain").innerHTML = v.ok ? `<span class="covered">Audit chain intact · ${v.events} events</span>`
+    : `<span class="gap">Audit chain BROKEN at event ${v.broken_at} · ${v.events} events checked</span>`;
 });
 
 // ── live run view ──
@@ -238,7 +331,8 @@ const STAGES = [["sources", "Sources", "feeds + OSV"], ["screen", "Screen", "Shi
                 ["review", "Review", "k9x-hil"]];
 const STAGE_OF = {sources: "sources", osv: "sources", collect: "sources", screen: "screen", compare: "compare",
                   triage: "triage", hil: "review", decision: "review"};
-let liveSeq = 0, liveTimer = null, chipState = {}, SOURCES = [];
+let liveSeq = 0, liveTimer = null, chipState = {}, SOURCES = [], srcCount = {}, itemSource = {}, srcFilter = null;
+const bump = (src, k) => { if (!src) return; srcCount[src] = srcCount[src] || {}; srcCount[src][k] = (srcCount[src][k] || 0) + 1; };
 function showLive(on) { document.getElementById("live").hidden = !on; }
 document.getElementById("livehide").addEventListener("click", () => showLive(false));
 function drawPipe(stage, sub, running) {
@@ -250,9 +344,22 @@ function drawPipe(stage, sub, running) {
   }).join("");
 }
 function drawChips() {
-  document.getElementById("chips").innerHTML = SOURCES.map(s =>
-    `<span class="chip ${chipState[s.id] || ""}" title="${esc(s.name)}">${esc(s.name)}</span>`).join("");
+  document.getElementById("chips").innerHTML = SOURCES.map(s => {
+    const c = srcCount[s.id] || {};
+    const hit = c.gap || c.partial || c.raised;
+    const badges = (c.new ? `<span class="badge new" title="new items">${c.new} new</span>` : "") +
+      (c.gap ? `<span class="badge gap" title="gaps">${c.gap} gap</span>` : "") +
+      (c.partial ? `<span class="badge partial" title="partial gaps">${c.partial} partial</span>` : "") +
+      (c.raised ? `<span class="badge raised" title="raised for human review">${c.raised} raised</span>` : "");
+    return `<span class="chip ${chipState[s.id] || ""} ${hit ? "hit" : ""} ${srcFilter === s.id ? "sel" : ""}" data-src="${esc(s.id)}"
+      title="${esc(s.name)} — click to show its findings">${esc(s.name)}${badges}</span>`;
+  }).join("");
 }
+document.getElementById("chips").addEventListener("click", e => {
+  const ch = e.target.closest(".chip"); if (!ch) return;
+  srcFilter = srcFilter === ch.dataset.src ? null : ch.dataset.src;
+  drawChips(); tab = TABS.length - 1; drawTabs(); loadItems();
+});
 function logLine(e) {
   const c = document.getElementById("console");
   const t = new Date(e.ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
@@ -269,6 +376,11 @@ async function pollLive() {
     liveSeq = e.seq; logLine(e);
     if (e.msg.startsWith("verdict:") || e.stage === "hil") refresh = true;
     if (e.source && (e.stage === "sources")) chipState[e.source] = e.level === "error" ? "error" : e.level === "ok" ? "ok" : "active";
+    if (e.stage === "sources" && e.level === "ok" && e.new) { srcCount[e.source] = srcCount[e.source] || {}; srcCount[e.source].new = e.new; }
+    if (e.item && e.source) itemSource[e.item] = e.source;
+    if (e.stage === "compare" && e.msg.startsWith("verdict: gap")) bump(itemSource[e.item], "gap");
+    if (e.stage === "compare" && e.msg.startsWith("verdict: partial")) bump(itemSource[e.item], "partial");
+    if (e.stage === "hil" && e.msg.startsWith("Published")) bump(itemSource[e.item], "raised");
   }
   const stage = STAGE_OF[d.current.stage] || null;
   const last = d.events.length ? d.events[d.events.length - 1].msg : "";
@@ -284,7 +396,10 @@ async function pollLive() {
 async function initLive() {
   try {
     const s = await api("/api/status");
-    SOURCES = s.sources || []; drawChips(); drawPipe(null, "", false);
+    SOURCES = s.sources || [];
+    for (const [src, c] of Object.entries(s.by_source || {})) srcCount[src] = {gap: c.gap, partial: c.partial, raised: c.raised};
+    drawChips(); drawPipe(null, "", false);
+    if (!s.state.running) showLive(Object.values(s.by_source || {}).some(c => c.gap || c.partial || c.raised));
     if (s.state.running) { showLive(true); pollLive(); }
   } catch (_) {}
 }
@@ -300,6 +415,8 @@ document.querySelector("nav.views").addEventListener("click", e => {
   document.querySelectorAll("nav.views button").forEach(x => x.classList.toggle("on", x === b));
   document.getElementById("view-findings").hidden = b.dataset.view !== "findings";
   document.getElementById("view-architecture").hidden = b.dataset.view !== "architecture";
+  document.getElementById("view-hil").hidden = b.dataset.view !== "hil";
+  if (b.dataset.view === "hil") loadHil();
 });
 
 drawTabs(); loadStatus(); loadItems(); route(); initLive();

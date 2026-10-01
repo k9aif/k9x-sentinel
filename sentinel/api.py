@@ -19,13 +19,14 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from sentinel import activity, auth, catalog, runner, store
 from sentinel.router.sentinel_router import get_router
-from sentinel.settings import (REPO_URL, analysis_model, credentials, github, hil_detail, kafka_broker, run_at)
+from sentinel.settings import (REPO_URL, analysis_model, credentials, github, hil_detail, hil_overdue_days, kafka_broker,
+                               run_at)
 
 log = logging.getLogger(__name__)
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -105,14 +106,16 @@ def status(_: str = Depends(login)):
             "settings": {"model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
                          "hil_detail": hil_detail(), "github_mode": gh["mode"], "github_repo": gh["repo"],
                          "github_token": bool(gh["token"])},
+            "database": store.backend(),
+            "by_source": store.source_counts(),
             "sources": [{"id": src["id"], "name": src.get("name", src["id"])} for src in get_router().config["sentinel"]["sources"]],
             "repo": REPO_URL}
 
 
 @app.get("/api/items")
-def items(status: Optional[str] = None, verdict: Optional[str] = None, limit: int = 200,
-          _: str = Depends(login)):
-    return store.list_items(status=status, verdict=verdict, limit=max(1, min(limit, 1000)))
+def items(status: Optional[str] = None, verdict: Optional[str] = None, source: Optional[str] = None,
+          limit: int = 200, _: str = Depends(login)):
+    return store.list_items(status=status, verdict=verdict, source=source, limit=max(1, min(limit, 1000)))
 
 
 @app.get("/api/items/{item_id}")
@@ -129,12 +132,51 @@ def live(since: int = 0, _: str = Depends(login)):
             "current": activity.current(), "events": activity.since(since)}
 
 
+@app.get("/api/items/{item_id}/audit")
+def item_audit(item_id: int, _: str = Depends(login)):
+    return store.item_audit(item_id)
+
+
+@app.get("/api/hil")
+def hil_history(_: str = Depends(login)):
+    return {"overdue_days": hil_overdue_days(), "cases": store.hil_history(hil_overdue_days())}
+
+
+@app.get("/api/audit/verify")
+def audit_verify(_: str = Depends(login)):
+    return store.verify_chain()
+
+
+@app.get("/api/audit.csv")
+def audit_csv(request: Request, user: str = Depends(login)):
+    import csv
+    import io
+    import json as _json
+    from datetime import datetime, timezone
+    store.audit("audit_exported", actor=user, address=_client(request))
+
+    def rows():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "time_utc", "run_id", "item_id", "event", "actor", "detail", "prev_hash", "hash"])
+        for e in store.audit_events():
+            w.writerow([e["id"], datetime.fromtimestamp(e["ts"], timezone.utc).isoformat(timespec="seconds"),
+                        e["run_id"], e["item_id"], e["event"], e["actor"],
+                        _json.dumps(e["detail"], sort_keys=True), e["prev_hash"], e["hash"]])
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate()
+    return StreamingResponse(rows(), media_type="text/csv",
+                             headers={"Content-Disposition": 'attachment; filename="k9x-sentinel-audit.csv"'})
+
+
 class RunRequest(BaseModel):
     sources: List[str] = []
 
 
 @app.post("/api/run")
-def run(body: RunRequest, _: str = Depends(login)):
+def run(body: RunRequest, request: Request, user: str = Depends(login)):
+    store.audit("run_requested", actor=user, address=_client(request), sources=body.sources or "all")
     if not runner.run_in_background(body.sources or None):
         raise HTTPException(409, "a run is already in progress")
     return {"status": "started"}
@@ -155,8 +197,10 @@ def sign_in(body: SignIn, request: Request):
         raise HTTPException(429, f"Too many failed sign-ins. Try again in {int(wait) // 60 + 1} min.")
     if not auth.check_password(body.username.strip(), body.password):
         auth.record_failure(addr)
+        store.audit("sign_in_failed", actor=body.username.strip()[:100] or "?", address=addr)
         raise HTTPException(401, "Wrong username or password")
     auth.record_success(addr)
+    store.audit("signed_in", actor=body.username.strip(), address=addr)
     resp = JSONResponse({"ok": True})
     resp.set_cookie(auth.COOKIE, auth.issue(body.username.strip()), max_age=auth.TTL_S, httponly=True,
                     samesite="lax", secure=request.url.scheme == "https", path="/")
@@ -164,7 +208,10 @@ def sign_in(body: SignIn, request: Request):
 
 
 @app.post("/api/logout")
-def sign_out():
+def sign_out(request: Request):
+    user = auth.verify(request.cookies.get(auth.COOKIE))
+    if user:
+        store.audit("signed_out", actor=user, address=_client(request))
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(auth.COOKIE, path="/")
     return resp

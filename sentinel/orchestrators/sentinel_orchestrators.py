@@ -26,14 +26,15 @@ from k9_aif_abb.k9_squad.squad_loader import SquadLoader
 
 from sentinel import activity, store
 from sentinel.agents.action_agents import DecisionAgent
-from sentinel.agents.assess_agents import ContentScreenAgent, GapAnalysisAgent, TriageAgent
+from sentinel.agents.assess_agents import ContentScreenAgent, GapAnalysisAgent, PrefilterAgent, TriageAgent
 from sentinel.agents.collect_agents import DependencyAuditAgent, FeedCollectorAgent
 from sentinel.agents.common import agent_config
+from sentinel.settings import hil_detail
 
 log = logging.getLogger(__name__)
 
 _SQUADS_YAML = Path(__file__).resolve().parent.parent / "squads" / "sentinel_squads.yaml"
-_AGENTS = [FeedCollectorAgent, DependencyAuditAgent, ContentScreenAgent, GapAnalysisAgent,
+_AGENTS = [FeedCollectorAgent, DependencyAuditAgent, PrefilterAgent, ContentScreenAgent, GapAnalysisAgent,
            TriageAgent, DecisionAgent]
 MAX_ATTEMPTS = 3
 
@@ -74,8 +75,16 @@ class AssessOrchestrator(_SentinelOrchestrator):
             result = self._squad("DecisionSquad").execute({"item_id": item_id,
                                                             "hil_decision": payload["hil_decision"]})
             return {"status": "decided", "item_id": item_id, **(result.get("decision") or {})}
+        item = store.get_item(item_id) or {}
         try:
-            result = self._squad("AssessSquad").execute({"item_id": item_id})
+            if item.get("status") == "hil_failed" and item.get("assessment"):
+                # Already assessed; only the hand-over to k9x-hil failed. Re-send it
+                # from the stored assessment: no second Guardian or model call.
+                activity.emit("triage", "already assessed: re-sending to review, no new model call", item=item_id,
+                              source=item.get("source"))
+                result = self._squad("RetriageSquad").execute({"item_id": item_id, "assessment": item["assessment"]})
+            else:
+                result = self._squad("AssessSquad").execute({"item_id": item_id})
         except RequiresHIL as exc:
             return self._raise_to_hil(exc, payload, item_id)
         except Exception as exc:
@@ -89,10 +98,14 @@ class AssessOrchestrator(_SentinelOrchestrator):
             # k9x-hil; keep it visible and retry it on the next run instead.
             store.update_item(item_id, status="hil_failed", error="Kafka unavailable: HIL case not sent")
             activity.emit("hil", "Kafka not configured / unreachable: kept, will be sent on the next run", "warn", item=item_id)
+            store.audit("hil_unsent", item_id, reason="Kafka not configured or unreachable", priority=exc.priority)
             return {"status": "hil_failed", "item_id": item_id}
         resume = {"event_type": "sentinel.assess", "item_id": item_id}
         out = self.handle_requires_hil(exc, resume)
         store.update_item(item_id, status="pending_hil", correlation_id=out.get("correlation_id"), error=None)
+        store.audit("raised_to_hil", item_id, correlation_id=out.get("correlation_id"),
+                    topic=str(out.get("reply_to", "")).replace("replies", "requests"), queue=exc.queue,
+                    priority=exc.priority, detail_level=hil_detail(), reason=exc.reason)
         activity.emit("hil", f"Published to k9x-hil · {out.get('reply_to', '').replace('replies', 'requests')}", "ok",
                       item=item_id)
         return {**out, "item_id": item_id}
@@ -107,6 +120,8 @@ class AssessOrchestrator(_SentinelOrchestrator):
         activity.emit("compare", f"assessment failed ({status}, attempt {data['attempts']}): {str(exc)[:120]}", "error",
                       item=item_id)
         store.update_item(item_id, status=status, data=data, error=f"{exc.__class__.__name__}: {exc}"[:500])
+        store.audit("assessment_failed", item_id, attempt=data["attempts"], final=status == "failed",
+                    error=f"{exc.__class__.__name__}: {exc}"[:500])
         return {"status": status, "item_id": item_id, "error": str(exc)[:300]}
 
 

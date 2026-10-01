@@ -13,13 +13,28 @@ squads:
         result_key: dependencies
 
   AssessSquad:
-    description: One item — screen it, compare it with the capability catalog, triage it.
-    agents: [ContentScreenAgent, GapAnalysisAgent, TriageAgent]
+    description: >
+      One item — a free relevance pre-filter, then (only if relevant) screen it,
+      compare it with the capability catalog, and triage it. A pre-filtered
+      item costs no Guardian and no model call.
+    agents: [PrefilterAgent, ContentScreenAgent, GapAnalysisAgent, TriageAgent]
     flow:
+      - agent: PrefilterAgent
+        result_key: prefilter
       - agent: ContentScreenAgent
         result_key: screened
+        when: {key: prefilter.relevant, eq: true}
       - agent: GapAnalysisAgent
         result_key: assessment
+        when: {key: prefilter.relevant, eq: true}
+      - agent: TriageAgent
+        result_key: triage
+        when: {key: prefilter.relevant, eq: true}
+
+  RetriageSquad:
+    description: Re-send an already assessed finding (Kafka was down) without assessing it again.
+    agents: [TriageAgent]
+    flow:
       - agent: TriageAgent
         result_key: triage
 

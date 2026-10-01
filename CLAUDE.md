@@ -33,6 +33,13 @@ become a GitHub draft advisory or issue (dry_run by default).
 - Agents call `self.enforce_governance()` first; orchestrators can't (it's a
   `BaseAgent` method).
 - Status values live in `store.py`'s docstring; the UI tabs depend on them.
+- **Storage is SQLAlchemy Core** (`store.py`): PostgreSQL when `SENTINEL_DB=postgres`
+  (schema `k9sentinel`), SQLite otherwise. Never raw `sqlite3`. `audit_events` is
+  append-only (DB trigger + hash chain, `verify_chain()`): record new facts with
+  `store.audit(...)`, never update or delete an event. The event's `actor` column
+  holds who did it; don't duplicate it in `detail`.
+- **A model call is the last resort**: keep the `prefilter:` gate for broad feeds and
+  the RetriageSquad path (re-send without re-assessing).
 
 ## Testing
 

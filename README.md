@@ -31,6 +31,38 @@ Sentinel spends its day reading attacker-written content, so it's built to survi
 - **Egress is Shield only.** Granite Guardian classifies *harmful content*, and an accurate analysis of a jailbreak technique reads as harmful to it. Verified live: it blocked every relevant assessment. The analysis agent's egress runs `OutputSanitizationCheck` (markup reaching the UI or GitHub) instead.
 - **Private findings:** a gap is an unpatched weakness in a public framework. The UI requires a login, must never be put on a public tunnel, and approved gaps become **private draft** security advisories, not public issues.
 
+## Audit trail and storage
+
+`SENTINEL_DB` in `.env` picks the database:
+
+| `SENTINEL_DB` | Where | Use for |
+|---|---|---|
+| `sqlite` (default) | `runtime/sentinel.db`, a local file | trying Sentinel out; no setup |
+| `postgres` | PostgreSQL, schema `k9sentinel` (`POSTGRES_*` settings) | any real deployment |
+
+Either way, every step is written to an **append-only audit trail** (`audit_events`):
+- what was collected;
+- how it was screened, with a SHA-256 of the exact text the model read;
+- which model and which k9-aif catalog version judged it;
+- when it was raised to human review;
+- who decided, with their comment;
+- decisions ignored because the person isn't an approver;
+- what was created on GitHub;
+- sign-ins, sign-outs and manual runs.
+
+A database trigger refuses UPDATE, DELETE and TRUNCATE. Each event also stores the hash of the one before it, so **Verify audit chain** (in HIL History) detects an event that was changed or removed by someone who disabled the trigger. **Export audit CSV** gives auditors the whole trail.
+
+**HIL History** lists every finding ever sent for review: when it was raised, how long it has waited (overdue after `SENTINEL_HIL_OVERDUE_DAYS`), the outcome, who decided, their comment and the GitHub result. A case nobody decides is a governance gap, and this view is how an admin asks why.
+
+In PostgreSQL mode the framework's record of open HIL cases (`hil_pending`) lives in the same schema, so the container needs no volume for anything that matters.
+
+## Cost
+
+A model call is the last resort:
+- **Pre-filter.** Broad feeds (ThreatLabz) carry a `prefilter:` list of AI terms. An item mentioning none of them is recorded as not relevant without Guardian or the model.
+- **Dependencies.** OSV findings never use a model.
+- **No repeat assessments.** A finding whose hand-over to k9x-hil failed is re-sent from its stored assessment.
+
 ## k9x-hil note (read before going live)
 
 As of this writing, k9x-hil (also served publicly at hil.k9x.ai with a demo login) has two authorization gaps that matter here:
@@ -46,7 +78,7 @@ Until k9x-hil takes the actor from the authenticated user and checks membership,
 cp .env.example .env              # set OLLAMA_BASE_URL, KAFKA_BROKER, SENTINEL_PASSWORD, ...
 python -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
 ./run.sh                          # pre-flight, then http://localhost:8114 (sign in with SENTINEL_USER / SENTINEL_PASSWORD)
-pytest -q                         # 48 tests, no network or models needed
+pytest -q                         # 59 tests, no network or models needed
 ```
 
 On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114, LAN only.

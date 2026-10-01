@@ -20,8 +20,9 @@ from k9_aif_abb.k9_core.messaging.k9_event_bus import K9EventBus
 from k9_aif_abb.k9_core.router.k9_event_router import K9EventRouter
 from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
 
+from sentinel import store
 from sentinel.orchestrators.sentinel_orchestrators import AssessOrchestrator, ScanOrchestrator
-from sentinel.settings import kafka_broker, load_config
+from sentinel.settings import db_mode, kafka_broker, load_config, postgres
 
 log = logging.getLogger(__name__)
 
@@ -50,11 +51,23 @@ def build_bus() -> Optional[K9EventBus]:
     return K9EventBus(broker_url=broker, topic="k9x-sentinel-events", group_id="k9x-sentinel-hil")
 
 
+def build_hil_state_store():
+    """Where open HIL cases are remembered (so a reply resumes the right flow).
+    PostgreSQL mode: the framework's RoutingStateStore in Sentinel's own schema;
+    SQLite mode: None, i.e. the framework's zero-config SQLite file (hil.db_path)."""
+    if db_mode() != "postgres":
+        return None
+    from k9_aif_abb.k9_storage.postgres_database_storage import PostgresDatabaseStorage
+    from k9_aif_abb.k9_storage.routing_state_store import RoutingStateStore
+    store.init()   # creates the schema first
+    return RoutingStateStore(db=PostgresDatabaseStorage(config={"postgres": postgres()}))
+
+
 @lru_cache(maxsize=1)
 def get_router() -> SentinelRouter:
     config = load_config()
     bus = build_bus()
-    router = SentinelRouter(config=config, message_bus=bus)
+    router = SentinelRouter(config=config, message_bus=bus, state_store=build_hil_state_store())
     router.register_orchestrator("sentinel.scan", ScanOrchestrator(config=config))
     router.register_orchestrator("sentinel.assess", AssessOrchestrator(
         config=config, message_bus=bus, hil_state_store=router.state_store))

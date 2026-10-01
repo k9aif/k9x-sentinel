@@ -32,6 +32,9 @@ class DecisionAgent(SentinelAgent):
             # Not an approver: ignore the decision and re-raise the case next run
             # (the pending HIL row is already resolved, so a new case is needed).
             record["outcome"] = "ignored_unauthorized"
+            store.audit("decision_ignored_unauthorized", item["id"], actor=actor or "unknown",
+                        action=decision.get("action"), comment=decision.get("comment"),
+                        correlation_id=decision.get("correlation_id"))
             store.update_item(item["id"], status="hil_failed", decision=record,
                               error=f"decision by {actor or 'unknown'} ignored (not in SENTINEL_HIL_APPROVERS); re-raised next run")
             return {"outcome": "ignored_unauthorized", "action": None}
@@ -40,6 +43,13 @@ class DecisionAgent(SentinelAgent):
             version = (item.get("assessment") or {}).get("framework_version") or "unknown"
             action = github_actions.perform(item, version)
         store.update_item(item["id"], status="decided", decision=record, action=action)
+        store.audit("decision_received", item["id"], actor=decision.get("actor") or "unknown", outcome=outcome,
+                    comment=decision.get("comment"), decided_at=decision.get("decided_at"),
+                    correlation_id=decision.get("correlation_id"))
+        if action:
+            store.audit("github_action", item["id"], mode=action.get("mode"), kind=action.get("kind"),
+                        ok=action.get("ok"), url=action.get("url"), error=action.get("error"),
+                        request_url=(action.get("request") or {}).get("url"))
         activity.emit("decision", f"#{item['id']} {outcome} by {decision.get('actor') or '?'}"
                       + (f" → GitHub {action['kind']} ({action['mode']})" if action else ""), "ok", item=item["id"])
         return {"outcome": outcome, "action": action}

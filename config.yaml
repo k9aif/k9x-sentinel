@@ -28,6 +28,12 @@ sentinel:
       kind: rss
       url: https://www.zscaler.com/blogs/feeds/security-research
       fetch_article: true
+      # Broad feed (mostly generic malware): an item reaches Guardian and the model
+      # only if its title or summary mentions one of these (whole words).
+      prefilter: &ai_terms [ai, llm, llms, "large language model", "generative ai", genai, agent, agents, agentic,
+                            chatbot, chatbots, copilot, "prompt injection", jailbreak, mcp, "model context protocol",
+                            rag, "retrieval-augmented", openai, chatgpt, anthropic, claude, gemini, deepseek,
+                            "machine learning", "artificial intelligence", deepfake, deepfakes]
     - id: owasp_genai
       name: OWASP GenAI Security Project
       kind: rss

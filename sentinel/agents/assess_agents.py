@@ -16,6 +16,7 @@ raised finding goes to a human."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -72,6 +73,42 @@ rationale, suggested_fix.
 </untrusted_document>"""
 
 
+# ── PrefilterAgent ──────────────────────────────────────────────────────────
+def prefilter_match(text: str, terms: List[str]) -> Optional[str]:
+    """First term found as a whole word (case-insensitive), else None."""
+    low = (text or "").lower()
+    for term in terms:
+        if re.search(r"(?<![a-z0-9])" + re.escape(term.lower()) + r"(?![a-z0-9])", low):
+            return term
+    return None
+
+
+class PrefilterAgent(SentinelAgent):
+    """Free relevance gate for broad feeds (``prefilter:`` terms on the source).
+    No terms on a source = always relevant (AI-specific sources)."""
+
+    layer = "K9X Sentinel PrefilterAgent SBB"
+
+    def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.enforce_governance()
+        item = store.get_item(int(payload["item_id"]))
+        src = next((s for s in self.config["sentinel"]["sources"] if s["id"] == item["source"]), {})
+        terms = src.get("prefilter") or []
+        if not terms or item["kind"] == "dependency":
+            return {"relevant": True, "why": "source is always assessed"}
+        hit = prefilter_match(f"{item['title']}\n{item.get('summary') or ''}", terms)
+        if hit:
+            return {"relevant": True, "why": f"mentions '{hit}'"}
+        why = "no AI / agent terms in title or summary (pre-filter, no model call)"
+        result = {"relevant": False, "verdict": "not_relevant", "threat": "", "taxonomy": [], "matched_capabilities": [],
+                  "known_gap": None, "severity": "low", "confidence": 1.0, "rationale": why, "suggested_fix": "",
+                  "dropped_ids": [], "prefiltered": True}
+        store.update_item(item["id"], assessment=result, verdict="not_relevant", severity="low", status="assessed", error=None)
+        store.audit("prefiltered", item["id"], why=why, terms=len(terms))
+        activity.emit("triage", f"#{item['id']} not relevant: {why}", item=item["id"], source=item["source"])
+        return {"relevant": False, "why": why}
+
+
 # ── ContentScreenAgent ──────────────────────────────────────────────────────
 class ContentScreenAgent(SentinelAgent):
     layer = "K9X Sentinel ContentScreenAgent SBB"
@@ -84,6 +121,7 @@ class ContentScreenAgent(SentinelAgent):
         activity.emit("screen", f"#{item['id']} {item['title'][:90]}", item=item["id"], source=item["source"])
         if item["kind"] == "dependency":   # OSV data, never read by a model
             activity.emit("screen", "dependency finding: no model reads it, skipping screening", item=item["id"])
+            store.audit("screened", item["id"], screened=False, reason="dependency finding, no model reads it")
             return {"text": item.get("summary") or "", "screen": {"screened": False, "flagged": False}}
         cfg = self.config.get("sentinel", {})
         src = next((s for s in self.config["sentinel"]["sources"] if s["id"] == item["source"]), {})
@@ -107,7 +145,12 @@ class ContentScreenAgent(SentinelAgent):
             screen.update(flagged=True, reason=str(exc)[:500])
             activity.emit("screen", "flagged: contains injection / manipulation text (analysed, never obeyed)",
                           "warn", item=item["id"])
+        screen["text_sha256"] = hashlib.sha256(text.encode()).hexdigest()
+        screen["text_chars"] = len(text)
         store.update_item(item["id"], screen=screen)
+        store.audit("screened", item["id"], flagged=screen["flagged"], reason=screen["reason"][:300],
+                    text_sha256=screen["text_sha256"], text_chars=len(text),
+                    guardian_model=self.config["governance"]["guardian"]["model"])
         return {"text": text, "screen": screen}
 
 
@@ -219,6 +262,13 @@ class GapAnalysisAgent(SentinelAgent):
         except PermissionError as exc:
             raise RuntimeError(f"assessment output blocked by governance: {exc}") from exc
         store.update_item(item["id"], assessment=result, verdict=result["verdict"], severity=result["severity"])
+        store.audit("assessed", item["id"], verdict=result["verdict"], severity=result["severity"],
+                    confidence=result["confidence"], taxonomy=result["taxonomy"],
+                    matched_capabilities=result["matched_capabilities"], known_gap=result["known_gap"],
+                    model=None if item["kind"] == "dependency" else self.config["inference"]["llm_factory"]["models"]["analyst"]["model"],
+                    framework_version=result.get("framework_version"), catalog_origin=result.get("catalog_origin"),
+                    text_sha256=((payload.get("screened") or {}).get("screen") or {}).get("text_sha256"),
+                    dropped_ids=result.get("dropped_ids"))
         verdict = result["verdict"].replace("_", " ")
         activity.emit("compare", f"verdict: {verdict} · {result['severity']} · confidence {result['confidence']}"
                       + (f" · controls: {', '.join(result['matched_capabilities'][:4])}" if result["matched_capabilities"] else ""),
@@ -277,6 +327,7 @@ class TriageAgent(SentinelAgent):
         if not raise_it:
             store.update_item(item["id"], status="assessed", error=None)
             activity.emit("triage", f"recorded, not raised ({why})", item=item["id"])
+            store.audit("recorded_not_raised", item["id"], why=why)
             return {"raised": False, "why": why}
         activity.emit("triage", "needs a human decision: raising to review", "warn", item=item["id"])
         detail = hil_detail()

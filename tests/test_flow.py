@@ -49,7 +49,7 @@ def answer(**kw):
 
 
 def article(content="Researchers show tool descriptions can carry instructions."):
-    return store.add_item({"uid": "t:1", "source": "threatlabz", "kind": "article", "title": "Tool poisoning",
+    return store.add_item({"uid": "t:1", "source": "willison_prompt_injection", "kind": "article", "title": "Tool poisoning",
                            "link": "https://example.com/p", "content": content})
 
 
@@ -181,3 +181,53 @@ def test_decisions_from_non_approvers_are_ignored_and_re_raised(shield_only, mod
     asyncio.run(router._on_hil_reply({"correlation_id": again["correlation_id"], "action": "complete",
                                       "actor": "RaviNatarajan@k9x.ai"}))
     assert store.get_item(out["item_id"])["decision"]["outcome"] == "approved"
+
+
+
+def test_broad_feed_items_without_ai_terms_never_reach_guardian_or_the_model(shield_only, monkeypatch):
+    from sentinel.agents import assess_agents as aa
+
+    def boom(*a, **k):
+        raise AssertionError("model called for a pre-filtered item")
+    monkeypatch.setattr(aa.GapAnalysisAgent, "ask", boom)
+    screened = []
+    monkeypatch.setattr(aa.ContentScreenAgent, "execute", lambda self, p: screened.append(p) or {})
+    item_id = store.add_item({"uid": "tz:1", "source": "threatlabz", "kind": "article",
+                              "title": "2CLoader: A New Malware Loader Delivering Vidar",
+                              "summary": "Windows loader with anti-VM tricks."})
+    bus = FakeBus()
+    out = build(bus).route({"event_type": "sentinel.assess", "item_id": item_id})
+    it = store.get_item(item_id)
+    assert out["status"] == "assessed" and it["verdict"] == "not_relevant" and it["assessment"]["prefiltered"]
+    assert not screened and not bus.sent
+    assert [e["event"] for e in store.item_audit(item_id)][-1] == "prefiltered"
+
+
+def test_broad_feed_items_that_mention_ai_are_assessed(shield_only, model):
+    item_id = store.add_item({"uid": "tz:2", "source": "threatlabz", "kind": "article",
+                              "title": "Attackers abuse an AI agent's MCP tools", "summary": "...",
+                              "content": "Tool descriptions carry instructions."})
+    out = build(FakeBus()).route({"event_type": "sentinel.assess", "item_id": item_id})
+    assert out["status"] == "pending_hil" and model[0]       # the model was asked
+
+
+def test_prefilter_matches_whole_words_only():
+    from sentinel.agents.assess_agents import prefilter_match
+    terms = ["ai", "agent", "llm"]
+    assert prefilter_match("New AI-driven phishing kit", terms) == "ai"
+    assert prefilter_match("Gmail detail leak via email agent", terms) == "agent"
+    assert prefilter_match("Detailed analysis of a Windows loader", terms) is None   # "ai" inside "detailed"
+    assert prefilter_match("Mail server flaw", terms) is None
+
+
+def test_resend_after_kafka_outage_reuses_the_assessment(shield_only, model, monkeypatch):
+    calls, _ = model
+    item_id = article()
+    assert build(None).route({"event_type": "sentinel.assess", "item_id": item_id})["status"] == "hil_failed"
+    assert len(calls) == 1
+    from sentinel.agents import assess_agents as aa
+    monkeypatch.setattr(aa.ContentScreenAgent, "execute", lambda self, p: (_ for _ in ()).throw(AssertionError("re-screened")))
+    bus = FakeBus()
+    out = build(bus).route({"event_type": "sentinel.assess", "item_id": item_id})
+    assert out["status"] == "pending_hil" and len(bus.sent) == 1
+    assert len(calls) == 1                                    # no second model call
