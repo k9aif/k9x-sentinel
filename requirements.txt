@@ -1,4 +1,4 @@
-k9-aif[kafka]>=1.14.0
+k9-aif[kafka]>=1.14.1
 fastapi>=0.111
 uvicorn[standard]>=0.30
 python-dotenv>=1.0
