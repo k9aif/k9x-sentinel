@@ -49,3 +49,12 @@ become a GitHub draft advisory or issue (dry_run by default).
 `pytest -q` needs no network or models: `tests/test_flow.py` runs the real
 framework HIL path (RequiresHIL → BaseHILOrchestrator → reply → resume)
 with only the model and the Kafka bus faked.
+
+## Command line and /sentinel
+
+`tools/sentinel_cli.py` (stdlib only) reads a running Sentinel with the admin login
+from `.env` (HTTP Basic + `X-Sentinel-Client`); `SENTINEL_URL` picks the host. The
+`/sentinel` Claude Code skill (`claude/skills/sentinel/SKILL.md`, installed to
+`~/.claude/skills/sentinel/`) calls it, verifies findings against the framework code
+and proposes changes, and stops before building. Keep the CLI's commands and the
+skill's steps in sync; a new API field the skill needs goes into the CLI first.

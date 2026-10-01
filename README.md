@@ -111,6 +111,31 @@ python3 tools/sentinel_cli.py report 1          # save run #1's HTML report
 ```
 `SENTINEL_URL` defaults to `https://sentinel.k9x.ai`.
 
+### `/sentinel` in Claude Code
+
+A Claude Code skill turns Sentinel's open findings into verified framework change proposals. The skill is [`claude/skills/sentinel/SKILL.md`](claude/skills/sentinel/SKILL.md); install it once with:
+
+```bash
+mkdir -p ~/.claude/skills/sentinel && cp claude/skills/sentinel/SKILL.md ~/.claude/skills/sentinel/
+```
+
+| Command | What happens |
+|---|---|
+| `/sentinel` | reads the open findings (gaps and partial gaps), checks each against the K9-AIF code and capability catalog, proposes changes |
+| `/sentinel run` | starts a run, follows it, then does the same |
+| `/sentinel 74` | one finding only |
+| `/sentinel status` | status and open findings, no analysis |
+
+How it works:
+1. **Read:** it calls `tools/sentinel_cli.py` (status, findings, item) with the admin login from `.env`. Set `SENTINEL_URL` there to reach Sentinel directly on the LAN.
+2. **Verify:** Sentinel's suggestion is a lead, not a fact. For each finding it finds the framework code the attack would pass through, runs the attack's payloads through the real Shield checks where it can, and quotes file:line.
+3. **Propose:** a table of changes (file, which findings each closes, size, catalog update), ordered by risk closed per effort and grouped into a release.
+4. **Stop:** nothing is built until you say which changes to make. Building then follows the framework's `CLAUDE.md`: tests, `capabilities.yaml` updated in the same commit, docs, changelog. PyPI only on an explicit go.
+
+It is read-only against Sentinel (except `run`), never approves or rejects review cases, and leaves GitHub actions in dry-run.
+
+The loop it closes: **threat published → Sentinel finds a gap → `/sentinel` proposes the fix → the framework ships it with a catalog entry → the same kind of threat comes back covered.**
+
 ### Hosting publicly (demo)
 
 Set `SENTINEL_DEMO_PASSWORD` to enable a read-only viewer; the sign-in page shows its credentials. A viewer sees:
@@ -143,6 +168,8 @@ sentinel/
   store.py  runner.py  api.py    SQLite, the daily run + scheduler, FastAPI
   auth.py                        sign-in sessions, lockout
 web/                             index.html (app), login.html, about.html, logo.svg, architecture.svg
+tools/sentinel_cli.py            command line for a running Sentinel (used by /sentinel)
+claude/skills/sentinel/          the /sentinel Claude Code skill
 ubuntu/                          Containerfile, build-run.sh
 ```
 
