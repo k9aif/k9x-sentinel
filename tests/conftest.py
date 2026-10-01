@@ -34,6 +34,13 @@ def isolated(tmp_path, monkeypatch):
     yield tmp_path
 
 
+@pytest.fixture(autouse=True)
+def no_real_embeddings(monkeypatch):
+    """Duplicate detection never calls a real model in tests (tests opt in to a fake)."""
+    from sentinel import dedup
+    monkeypatch.setattr(dedup.Embedder, "vector", lambda self, text: None)
+
+
 @pytest.fixture
 def shield_only(monkeypatch):
     """Agents screen with Shield only (no Ollama/Guardian in unit tests)."""

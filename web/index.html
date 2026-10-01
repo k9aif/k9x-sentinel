@@ -173,7 +173,7 @@
 const TABS = [
   ["Needs review", {status: "pending_hil"}], ["Gaps", {verdict: "gap"}], ["Partial", {verdict: "partial"}],
   ["Covered", {verdict: "covered"}], ["Not relevant", {verdict: "not_relevant"}], ["Decided", {status: "decided"}],
-  ["Errors", {status: "error"}], ["Failed", {status: "failed"}], ["Unsent (no Kafka)", {status: "hil_failed"}], ["All", {}],
+  ["Duplicates", {status: "duplicate"}], ["Errors", {status: "error"}], ["Failed", {status: "failed"}], ["Unsent (no Kafka)", {status: "hil_failed"}], ["All", {}],
 ];
 let tab = 0;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -235,6 +235,8 @@ async function showItem(id) {
     <dl>
       <dt>Published</dt><dd>${it.published ? new Date(it.published * 1000).toLocaleString() : "— (the source gives no date)"}</dd>
       <dt>Collected</dt><dd>${new Date(it.first_seen * 1000).toLocaleString()}</dd>
+      ${(it.data || {}).duplicate_of ? `<dt>Duplicate of</dt><dd><a href="#item-${(it.data || {}).duplicate_of}">#${(it.data || {}).duplicate_of}</a> · ${esc(it.data.duplicate_reason || "")} — not raised again</dd>` : ""}
+      ${(it.data || {}).possible_duplicate_of ? `<dt>Possible duplicate</dt><dd><a href="#item-${it.data.possible_duplicate_of}">#${it.data.possible_duplicate_of}</a> · ${esc(it.data.duplicate_reason || "")} — raised, reviewer decides</dd>` : ""}
       <dt>Threat</dt><dd>${esc(a.threat || "—")}</dd>
       <dt>Severity · confidence</dt><dd>${esc(a.severity || "—")} · ${esc(a.confidence ?? "—")}</dd>
       <dt>OWASP</dt><dd>${esc((a.taxonomy || []).join(", ") || "—")}</dd>
@@ -275,7 +277,8 @@ document.getElementById("runbtn").addEventListener("click", async () => {
 
 // ── audit + HIL history ──
 const EVENT_LABEL = {item_collected: "Collected", screened: "Screened", assessed: "Assessed", recorded_not_raised: "Recorded, not raised",
-  prefiltered: "Not relevant (pre-filter, no model call)", raised_to_hil: "Raised to human review",
+  prefiltered: "Not relevant (pre-filter, no model call)", duplicate_not_raised: "Duplicate, not raised",
+  raised_to_hil: "Raised to human review",
   hil_unsent: "Not sent (Kafka unavailable)", decision_received: "Decision received",
   decision_ignored_unauthorized: "Decision ignored (not an approver)", github_action: "GitHub", assessment_failed: "Assessment failed"};
 const fmt = ts => ts ? new Date(ts * 1000).toLocaleString() : "—";
@@ -289,6 +292,7 @@ function eventDetail(e) {
     case "decision_ignored_unauthorized": return `${d.action || ""} — not in SENTINEL_HIL_APPROVERS`;
     case "github_action": return `${d.kind} · ${d.mode}${d.url ? " · " + d.url : ""}${d.error ? " · " + d.error : ""}`;
     case "recorded_not_raised": case "prefiltered": return d.why;
+    case "duplicate_not_raised": return `duplicate of #${d.duplicate_of}: ${d.reason}`;
     case "item_collected": return `${d.source} · ${d.status}`;
     default: return Object.entries(d).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ");
   }
@@ -357,7 +361,7 @@ function drawChips() {
       (c.partial ? `<span class="badge partial" title="partial gaps">${c.partial} partial</span>` : "") +
       (c.raised ? `<span class="badge raised" title="raised for human review">${c.raised} raised</span>` : "");
     return `<span class="chip ${chipState[s.id] || ""} ${hit} ${srcFilter === s.id ? "sel" : ""}" data-src="${esc(s.id)}"
-      title="${esc(s.name)} — click to show its findings">${esc(s.name)}${badges}</span>`;
+      title="${esc(s.name)}&#10;${esc(s.url || "")}&#10;click to show its findings">${esc(s.name)}${badges}</span>`;
   }).join("");
 }
 document.getElementById("chips").addEventListener("click", e => {

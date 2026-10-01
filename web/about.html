@@ -91,6 +91,10 @@
     <tr><td><b>Dependencies</b></td><td>OSV, for every package k9-aif declares</td><td>No model. Is the lowest version k9-aif <i>allows</i> affected by an advisory that has a fix? Then "raise the floor to X".</td></tr>
   </table></div>
   <p>Only relevant gaps and partial gaps of at least medium severity reach a person. Everything else is recorded and visible in Sentinel.</p>
+  <h3>The sources it reads today</h3>
+  <p>Configured in <code>config.yaml</code> (<code>sentinel.sources</code>): adding a feed is one entry.</p>
+  <div class="tablewrap"><table><thead><tr><th>Source</th><th>Kind</th><th>Endpoint</th></tr></thead>
+    <tbody id="srclist"><tr><td colspan="3" style="color:var(--mute)">loading…</td></tr></tbody></table></div>
 </section>
 
 <section id="current">
@@ -165,6 +169,14 @@ ubuntu/build-run.sh run     # run now instead of waiting for 06:00</pre>
   <a class="back" href="/login">← Open Sentinel</a>
 </section>
 </main>
+<script>
+fetch("/api/public").then(r => r.json()).then(p => {
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const kind = {rss: "RSS feed", atom: "Atom feed", cisa_kev: "CISA KEV (JSON)", osv: "OSV API"};
+  document.getElementById("srclist").innerHTML = (p.sources || []).map(s => `<tr><td><b>${esc(s.name)}</b>${s.prefilter ? "<br><span style=\"color:var(--mute);font-size:13px\">pre-filtered: AI items only reach the model</span>" : ""}</td>
+    <td>${esc(kind[s.kind] || s.kind)}</td><td><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)}</a></td></tr>`).join("");
+}).catch(() => {});
+</script>
 <footer>K9X Sentinel · part of the K9X ecosystem built on K9-AIF · Apache-2.0 · <a href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener noreferrer">github.com/k9aif/k9x-sentinel</a></footer>
 </body>
 </html>

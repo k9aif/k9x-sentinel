@@ -56,6 +56,20 @@ A database trigger refuses UPDATE, DELETE and TRUNCATE. Each event also stores t
 
 In PostgreSQL mode the framework's record of open HIL cases (`hil_pending`) lives in the same schema, so the container needs no volume for anything that matters.
 
+## No duplicate review cases
+
+- **Running Sentinel again** never re-sends anything: every item has a stable id per source, and a finding already sent for review is never queued again.
+- **The same threat from another source** is compared, before it's raised, with every finding already sent for review (`sentinel/dedup.py`):
+
+| Signal | Result |
+|---|---|
+| same CVE / GHSA id | duplicate: recorded, linked, not raised |
+| same dependency package with a case still open | duplicate: not raised |
+| meaning similarity ≥ 0.80 and a shared OWASP id | duplicate: not raised |
+| meaning similarity ≥ 0.72 | raised, labelled "possible duplicate of #N" for the reviewer |
+
+Meaning similarity uses the framework's embedding service (Ollama `nomic-embed-text`). On real threat descriptions it scored 0.81–0.88 for the same technique written differently, and 0.54–0.68 for different ones. If the embedding model is unavailable, only the id rules apply: a finding is never blocked because the comparison couldn't run.
+
 ## Cost
 
 A model call is the last resort:
@@ -78,7 +92,7 @@ Until k9x-hil takes the actor from the authenticated user and checks membership,
 cp .env.example .env              # set OLLAMA_BASE_URL, KAFKA_BROKER, SENTINEL_PASSWORD, ...
 python -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
 ./run.sh                          # pre-flight, then http://localhost:8114 (sign in with SENTINEL_USER / SENTINEL_PASSWORD)
-pytest -q                         # 65 tests, no network or models needed
+pytest -q                         # 76 tests, no network or models needed
 ```
 
 On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114.

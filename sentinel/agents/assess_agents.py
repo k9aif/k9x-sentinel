@@ -27,7 +27,7 @@ from k9_aif_abb.k9_core.orchestration.hil_signal import RequiresHIL
 from k9_aif_abb.k9_security.tool_result_guard import screen_tool_result
 from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
 
-from sentinel import activity, catalog, sources, store
+from sentinel import activity, catalog, dedup, sources, store
 from sentinel.agents.common import SentinelAgent
 from sentinel.settings import SEVERITIES, hil_detail, public_url, severity_at_least
 
@@ -333,12 +333,26 @@ class TriageAgent(SentinelAgent):
             activity.emit("triage", f"recorded, not raised ({why})", item=item["id"])
             store.audit("recorded_not_raised", item["id"], why=why)
             return {"raised": False, "why": why}
-        activity.emit("triage", "needs a human decision: raising to review", "warn", item=item["id"])
+        dup = dedup.find_duplicate(item, a, self.config)
+        if dup and dup["certain"]:
+            data = {**(item.get("data") or {}), "duplicate_of": dup["of"], "duplicate_reason": dup["reason"]}
+            store.update_item(item["id"], status="duplicate", data=data, error=None)
+            store.audit("duplicate_not_raised", item["id"], duplicate_of=dup["of"], reason=dup["reason"],
+                        score=dup["score"])
+            activity.emit("triage", f"duplicate of #{dup['of']} ({dup['reason']}): not raised", item=item["id"])
+            return {"raised": False, "why": f"duplicate of #{dup['of']}", "duplicate_of": dup["of"]}
+        if dup:
+            store.update_item(item["id"], data={**(item.get("data") or {}), "possible_duplicate_of": dup["of"],
+                                                 "duplicate_reason": dup["reason"]})
+        activity.emit("triage", "needs a human decision: raising to review"
+                      + (f" (possible duplicate of #{dup['of']})" if dup else ""), "warn", item=item["id"])
         detail = hil_detail()
         label = "dependency floor" if item["kind"] == "dependency" else a["verdict"]
+        maybe = f" Possible duplicate of #{dup['of']}." if dup else ""
         if detail == "full":
-            reason = f"Sentinel #{item['id']} ({label}, {a['severity']}): {a.get('threat') or item['title']}"
+            reason = f"Sentinel #{item['id']} ({label}, {a['severity']}): {a.get('threat') or item['title']}.{maybe}"
         else:
-            reason = f"K9X Sentinel finding #{item['id']} — {label}, {a['severity']} severity. Review: {public_url()}/#item-{item['id']}"
+            reason = (f"K9X Sentinel finding #{item['id']} — {label}, {a['severity']} severity.{maybe} "
+                      f"Review: {public_url()}/#item-{item['id']}")
         raise RequiresHIL(reason=reason[:480], context=hil_context(item, a, detail),
                           priority=a["severity"], queue=cfg.get("hil", {}).get("queue", "framework_security_updates"))

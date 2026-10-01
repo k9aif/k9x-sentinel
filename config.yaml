@@ -18,6 +18,10 @@ sentinel:
     # A threat that maps to an already-known gap is recorded against it, not
     # raised again, unless its severity is at or above this:
     known_gap_reraise_severity: high
+    # Duplicates (sentinel/dedup.py), compared with everything already sent for review:
+    duplicate_similarity: 0.80            # same threat: not raised (needs a shared OWASP id too)
+    possible_duplicate_similarity: 0.72   # raised, labelled "possible duplicate of #N"
+    duplicate_window_days: 180
 
   hil:
     queue: framework_security_updates
@@ -80,6 +84,11 @@ sentinel:
       kind: osv
       url: https://api.osv.dev/v1/query
       package: k9-aif
+
+# Meaning-based duplicate detection: the framework's EmbeddingServiceFactory (Ollama)
+vectordb:
+  embedding_provider: ollama
+  embedding_model: "${SENTINEL_EMBEDDING_MODEL:-nomic-embed-text}"
 
 governance:
   guardian:

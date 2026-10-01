@@ -137,7 +137,7 @@ def _seed():
 
 
 def test_demo_login_is_shown_and_read_only(client, demo_on):
-    assert client.get("/api/public").json() == {"demo": {"user": "demo", "password": "demo"}}
+    assert client.get("/api/public").json()["demo"] == {"user": "demo", "password": "demo"}
     assert client.post("/api/login", json={"username": "demo", "password": "demo"}).status_code == 200
     assert client.get("/api/me").json() == {"user": "demo", "role": "viewer"}
     assert client.post("/api/run", json={}).status_code == 403
@@ -180,5 +180,13 @@ def test_admin_still_sees_everything(client, demo_on):
 def test_demo_off_by_default(client, monkeypatch):
     monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
     monkeypatch.setenv("SENTINEL_DEMO_PASSWORD", "")
-    assert client.get("/api/public").json() == {"demo": None}
+    assert client.get("/api/public").json()["demo"] is None
     assert client.post("/api/login", json={"username": "demo", "password": ""}).status_code == 401
+
+
+def test_feed_endpoints_are_public_but_infrastructure_is_not(client):
+    srcs = client.get("/api/public").json()["sources"]
+    assert any(s["url"].startswith("https://www.zscaler.com/") for s in srcs)
+    body = client.get("/api/public").text
+    for private in ("11434", "9092", "5432", "POSTGRES", "password\": \"s3cret"):
+        assert private not in body

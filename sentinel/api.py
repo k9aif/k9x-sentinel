@@ -142,7 +142,8 @@ def status(user: str = Depends(login)):
                          "github_token": bool(gh["token"])},
             "database": {**store.backend(), "where": "hidden"} if viewer(user) else store.backend(),
             "by_source": store.source_counts(),
-            "sources": [{"id": src["id"], "name": src.get("name", src["id"])} for src in get_router().config["sentinel"]["sources"]],
+            "sources": [{"id": src["id"], "name": src.get("name", src["id"]), "kind": src["kind"], "url": src["url"],
+                 "prefilter": bool(src.get("prefilter"))} for src in get_router().config["sentinel"]["sources"]],
             "repo": REPO_URL}
 
 
@@ -182,7 +183,9 @@ def me(user: str = Depends(login)):
 def public_info():
     """For the sign-in page: the demo login, when one is enabled."""
     demo = demo_credentials()
-    return {"demo": {"user": demo["user"], "password": demo["password"]} if demo["password"] else None}
+    return {"demo": {"user": demo["user"], "password": demo["password"]} if demo["password"] else None,
+            "sources": [{"id": src["id"], "name": src.get("name", src["id"]), "kind": src["kind"], "url": src["url"],
+                 "prefilter": bool(src.get("prefilter"))} for src in get_router().config["sentinel"]["sources"]]}
 
 
 @app.get("/api/items/{item_id}/audit")

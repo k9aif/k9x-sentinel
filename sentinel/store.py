@@ -24,6 +24,7 @@ of how it got there is in ``audit_events``.
             decided      a reviewer approved, rejected or the case expired
             error        assessment failed; retried next run (up to 3 attempts)
             failed       assessment failed 3 times; left for a person to look at
+            duplicate    same finding as one already sent for review (data.duplicate_of); not raised
 """
 
 from __future__ import annotations
@@ -293,6 +294,15 @@ def update_item(item_id: int, **fields: Any) -> None:
     fields["updated"] = time.time()
     with _engine().begin() as con:
         con.execute(update(t).where(t.c.id == item_id).values(**fields))
+
+
+def items_for_dedup(statuses: Iterable[str], since: float) -> List[Dict[str, Any]]:
+    """Findings already sent for review, newest first (duplicate detection)."""
+    t = _t("items")
+    q = select(t.c.id, t.c.kind, t.c.title, t.c.summary, t.c.status, t.c.data, t.c.assessment).where(
+        t.c.status.in_(list(statuses)), func.coalesce(t.c.updated, t.c.first_seen) >= since).order_by(t.c.id.desc())
+    with _engine().connect() as con:
+        return [_row(r) for r in con.execute(q)]
 
 
 def ids_with_status(statuses: Iterable[str]) -> List[int]:
