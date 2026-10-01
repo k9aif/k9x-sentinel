@@ -111,8 +111,8 @@
   <!-- ── Framework lane ── -->
   <rect class="box" x="562" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
   <text class="t" x="574" y="440">capabilities.yaml</text>
-  <text class="l" x="574" y="458">25 controls mapped to OWASP</text>
-  <text class="l" x="574" y="474">LLM01–10 · ASI01–10,</text>
+  <text class="l" x="574" y="458">25 controls mapped to</text>
+  <text class="l" x="574" y="474">OWASP LLM01–10 · ASI01–10,</text>
   <text class="l" x="574" y="490">plus known gaps</text>
 
   <rect class="box" x="962" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
@@ -129,14 +129,14 @@
 
   <!-- ── People lane ── -->
   <rect class="box" x="762" y="545" width="176" height="84" fill="#ffffff" stroke="#b07d2e"/>
-  <text class="t" x="774" y="565">Sentinel UI :8114</text>
-  <text class="l" x="774" y="583">login, LAN only (private)</text>
-  <text class="l" x="774" y="599">every finding, verdict,</text>
-  <text class="l" x="774" y="615">rationale, suggested fix</text>
+  <text class="t" x="774" y="565">sentinel.k9x.ai</text>
+  <text class="l" x="774" y="583">admin: everything; demo:</text>
+  <text class="l" x="774" y="599">read-only, open gaps</text>
+  <text class="l" x="774" y="615">shown as "private review"</text>
 
   <rect class="box" x="962" y="545" width="176" height="84" fill="#ffffff" stroke="#b07d2e"/>
   <text class="t" x="974" y="565">6 · k9x-hil case</text>
-  <text class="l" x="974" y="583">Framework Security Updates</text>
+  <text class="l" x="974" y="583">K9X Sentinel · Security tasks</text>
   <text class="l" x="974" y="599">reviewer: approve · reject</text>
   <text class="l" x="974" y="615">(or the case expires)</text>
 
@@ -150,10 +150,10 @@
 
   <rect x="162" y="672" width="560" height="96" rx="8" fill="none" stroke="#b9c2d3" stroke-dasharray="4 4"/>
   <text class="t" x="176" y="694">Why findings stay private</text>
-  <text class="l" x="176" y="714">A gap is an unpatched weakness in a public framework. The UI needs a login and stays off public</text>
-  <text class="l" x="176" y="730">tunnels; HIL cases carry only #, verdict, severity and a link; approved gaps become draft</text>
-  <text class="l" x="176" y="746">advisories, published only when the fix ships. Article text is untrusted: the model has no tools</text>
-  <text class="l" x="176" y="762">and its answer must be JSON whose ids exist in the catalog.</text>
+  <text class="l" x="176" y="714">A gap is an unpatched weakness in a public framework. Only admins see its details;</text>
+  <text class="l" x="176" y="730">demo visitors see “under private review”. HIL cases carry only #, verdict, severity</text>
+  <text class="l" x="176" y="746">and a link. Approved gaps become draft advisories, published only when the fix ships.</text>
+  <text class="l" x="176" y="762">Article text is untrusted: the model has no tools; its JSON answer is checked vs the catalog.</text>
 
   <!-- ── edges ── -->
   <path class="edge" d="M250,188 L250,226"/>
