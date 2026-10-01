@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 800" width="1420" height="800" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>K9X Sentinel — what it does</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a8396"/>
+    </marker>
+    <style>
+      .lane-label { font-size: 14px; font-weight: 700; fill: #1d2330; }
+      .lane-sub { font-size: 11px; fill: #5d6678; }
+      .box { stroke-width: 1.4; rx: 8; }
+      .t { font-size: 13px; font-weight: 700; fill: #1d2330; }
+      .l { font-size: 11.5px; fill: #303848; }
+      .edge { stroke: #3b4252; stroke-width: 1.6; fill: none; marker-end: url(#arr); }
+      .dash { stroke: #7a8396; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrg); }
+      .el { font-size: 11px; fill: #3b4252; font-style: italic; }
+      .chip { fill: #ffffff; stroke: #b9c2d3; rx: 12; }
+      .chipt { font-size: 11.5px; fill: #1d2330; }
+    </style>
+  </defs>
+
+  <rect width="1420" height="800" fill="#ffffff"/>
+  <text x="20" y="34" font-size="20" font-weight="700" fill="#1d2330">K9X Sentinel — daily threat watch for the K9-AIF framework</text>
+  <text x="20" y="54" font-size="12.5" fill="#5d6678">Reads new threats every morning, compares each with what the framework already defends against, and asks a human only about the gaps.</text>
+
+  <!-- ── lanes (horizontal bands, top to bottom) ── -->
+  <rect x="10" y="70"  width="1400" height="130" fill="#f3f6fb"/>
+  <rect x="10" y="200" width="1400" height="200" fill="#eef4ee"/>
+  <rect x="10" y="400" width="1400" height="125" fill="#f6f2fa"/>
+  <rect x="10" y="525" width="1400" height="125" fill="#fbf5ec"/>
+  <rect x="10" y="650" width="1400" height="140" fill="#f2f2f2"/>
+  <g stroke="#d5dae3"><line x1="10" y1="200" x2="1410" y2="200"/><line x1="10" y1="400" x2="1410" y2="400"/>
+    <line x1="10" y1="525" x2="1410" y2="525"/><line x1="10" y1="650" x2="1410" y2="650"/>
+    <line x1="140" y1="70" x2="140" y2="790"/></g>
+
+  <text class="lane-label" x="22" y="128">Sources</text>
+  <text class="lane-sub" x="22" y="146">read daily, 06:00</text>
+  <text class="lane-label" x="22" y="292">K9X Sentinel</text>
+  <text class="lane-sub" x="22" y="310">a K9-AIF solution</text>
+  <text class="lane-sub" x="22" y="325">Router → Orchestrators</text>
+  <text class="lane-sub" x="22" y="340">→ Squads → Agents</text>
+  <text class="lane-label" x="22" y="458">K9-AIF</text>
+  <text class="lane-label" x="22" y="476">framework</text>
+  <text class="lane-label" x="22" y="582">People</text>
+  <text class="lane-sub" x="22" y="600">review &amp; decide</text>
+  <text class="lane-label" x="22" y="712">GitHub</text>
+  <text class="lane-sub" x="22" y="730">k9-aif-framework</text>
+
+  <!-- ── Sources ── -->
+  <rect x="162" y="82" width="598" height="106" rx="10" fill="#ffffff" stroke="#8aa1cf" stroke-width="1.4"/>
+  <text class="t" x="176" y="102">Technique track — threat-intelligence feeds</text>
+  <g>
+    <rect class="chip" x="176" y="114" width="138" height="26"/><text class="chipt" x="188" y="131">Zscaler ThreatLabz</text>
+    <rect class="chip" x="322" y="114" width="110" height="26"/><text class="chipt" x="334" y="131">OWASP GenAI</text>
+    <rect class="chip" x="440" y="114" width="196" height="26"/><text class="chipt" x="452" y="131">OWASP LLM Top 10 releases</text>
+    <rect class="chip" x="644" y="114" width="104" height="26"/><text class="chipt" x="656" y="131">MITRE ATLAS</text>
+    <rect class="chip" x="176" y="148" width="214" height="26"/><text class="chipt" x="188" y="165">CISA KEV (AI / stack keywords)</text>
+    <rect class="chip" x="398" y="148" width="260" height="26"/><text class="chipt" x="410" y="165">Simon Willison · Embrace The Red (research)</text>
+  </g>
+
+  <rect x="790" y="82" width="250" height="106" rx="10" fill="#ffffff" stroke="#8aa1cf" stroke-width="1.4"/>
+  <text class="t" x="804" y="102">Dependency track — OSV</text>
+  <text class="l" x="804" y="122">Does the lowest version k9-aif</text>
+  <text class="l" x="804" y="138">allows (e.g. requests&gt;=2.28) have</text>
+  <text class="l" x="804" y="154">a known, fixed vulnerability?</text>
+  <text class="l" x="804" y="174" font-weight="700">Deterministic — no model</text>
+
+  <!-- ── Sentinel lane ── -->
+  <g>
+    <rect class="box" x="162" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="174" y="248">1 · Collect</text>
+    <text class="l" x="174" y="266">CollectSquad</text>
+    <text class="l" x="174" y="282">only new items (de-duped)</text>
+    <text class="l" x="174" y="298">public URLs, safe parsing</text>
+
+    <rect class="box" x="362" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="374" y="248">2 · Screen</text>
+    <text class="l" x="374" y="266">Shield + Granite Guardian</text>
+    <text class="l" x="374" y="282">labels injection text</text>
+    <text class="l" x="374" y="298">in articles; never hides it</text>
+
+    <rect class="box" x="562" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="574" y="248">3 · Compare</text>
+    <text class="l" x="574" y="266">model (qwen3.8, no tools):</text>
+    <text class="l" x="574" y="282">covered · partial · gap</text>
+    <text class="l" x="574" y="298">answer checked vs catalog</text>
+
+    <rect class="box" x="762" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="774" y="248">4 · Triage</text>
+    <text class="l" x="774" y="266">gap or partial, severity ≥</text>
+    <text class="l" x="774" y="282">medium, confidence ≥ 0.5;</text>
+    <text class="l" x="774" y="298">known gaps not re-raised</text>
+
+    <rect class="box" x="962" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="974" y="248">5 · Raise</text>
+    <text class="l" x="974" y="266">one finding = one flow;</text>
+    <text class="l" x="974" y="282">agent raises RequiresHIL,</text>
+    <text class="l" x="974" y="298">orchestrator hands it over</text>
+
+    <rect class="box" x="1182" y="228" width="176" height="84" fill="#ffffff" stroke="#4f8a5b"/>
+    <text class="t" x="1194" y="248">7 · Act on the decision</text>
+    <text class="l" x="1194" y="266">approved reviewers only</text>
+    <text class="l" x="1194" y="282">approve → GitHub; reject /</text>
+    <text class="l" x="1194" y="298">expire → recorded. No code.</text>
+  </g>
+  
+  <text class="el" x="374" y="335">OSV findings skip steps 2–3 (no model)</text>
+
+  <!-- ── Framework lane ── -->
+  <rect class="box" x="562" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
+  <text class="t" x="574" y="440">capabilities.yaml</text>
+  <text class="l" x="574" y="458">25 controls mapped to OWASP</text>
+  <text class="l" x="574" y="474">LLM01–10 · ASI01–10,</text>
+  <text class="l" x="574" y="490">plus known gaps</text>
+
+  <rect class="box" x="962" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
+  <text class="t" x="974" y="440">BaseHILOrchestrator</text>
+  <text class="l" x="974" y="458">publishes to Kafka:</text>
+  <text class="l" x="974" y="474">hil.requests.</text>
+  <text class="l" x="974" y="490">framework_security_updates</text>
+
+  <rect class="box" x="1182" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
+  <text class="t" x="1194" y="440">K9EventRouter</text>
+  <text class="l" x="1194" y="458">listens for the reply,</text>
+  <text class="l" x="1194" y="474">resumes the same flow by</text>
+  <text class="l" x="1194" y="490">correlation id (once)</text>
+
+  <!-- ── People lane ── -->
+  <rect class="box" x="762" y="545" width="176" height="84" fill="#ffffff" stroke="#b07d2e"/>
+  <text class="t" x="774" y="565">Sentinel UI :8114</text>
+  <text class="l" x="774" y="583">login, LAN only (private)</text>
+  <text class="l" x="774" y="599">every finding, verdict,</text>
+  <text class="l" x="774" y="615">rationale, suggested fix</text>
+
+  <rect class="box" x="962" y="545" width="176" height="84" fill="#ffffff" stroke="#b07d2e"/>
+  <text class="t" x="974" y="565">6 · k9x-hil case</text>
+  <text class="l" x="974" y="583">Framework Security Updates</text>
+  <text class="l" x="974" y="599">reviewer: approve · reject</text>
+  <text class="l" x="974" y="615">(or the case expires)</text>
+
+  <!-- ── GitHub lane ── -->
+  <rect class="box" x="1182" y="672" width="176" height="96" fill="#ffffff" stroke="#555d6e"/>
+  <text class="t" x="1194" y="692">k9-aif-framework</text>
+  <text class="l" x="1194" y="710">gap → private draft</text>
+  <text class="l" x="1194" y="726">security advisory</text>
+  <text class="l" x="1194" y="742">dependency → issue</text>
+  <text class="l" x="1194" y="758">dry run until token is set</text>
+
+  <rect x="162" y="672" width="560" height="96" rx="8" fill="none" stroke="#b9c2d3" stroke-dasharray="4 4"/>
+  <text class="t" x="176" y="694">Why findings stay private</text>
+  <text class="l" x="176" y="714">A gap is an unpatched weakness in a public framework. The UI needs a login and stays off public</text>
+  <text class="l" x="176" y="730">tunnels; HIL cases carry only #, verdict, severity and a link; approved gaps become draft</text>
+  <text class="l" x="176" y="746">advisories, published only when the fix ships. Article text is untrusted: the model has no tools</text>
+  <text class="l" x="176" y="762">and its answer must be JSON whose ids exist in the catalog.</text>
+
+  <!-- ── edges ── -->
+  <path class="edge" d="M250,188 L250,226"/>
+  <path class="edge" d="M915,188 L915,206 L310,206 L310,226"/>
+  <path class="edge" d="M338,270 L360,270"/>
+  <path class="edge" d="M538,270 L560,270"/>
+  <path class="edge" d="M738,270 L760,270"/>
+  <path class="edge" d="M938,270 L960,270"/>
+  <path class="edge" d="M650,420 L650,314"/>
+  <text class="el" x="658" y="372">judged against</text>
+  <path class="edge" d="M1050,312 L1050,418"/>
+  <path class="edge" d="M1050,504 L1050,543"/>
+  <path class="edge" d="M1138,587 L1240,587 L1240,506"/>
+  <text class="el" x="1146" y="580">hil.replies.…</text>
+  <path class="edge" d="M1240,420 L1240,314"/>
+  <path class="edge" d="M1358,270 L1394,270 L1394,720 L1360,720"/>
+  <path class="dash" d="M850,312 L850,543"/>
+  <text class="el" x="858" y="372">everything is</text>
+  <text class="el" x="858" y="386">recorded here</text>
+</svg>

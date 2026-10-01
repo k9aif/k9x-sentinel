@@ -19,7 +19,7 @@ def test_health_is_open(client):
 
 def test_everything_else_needs_the_login(client, monkeypatch):
     monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
-    for path in ("/", "/api/status", "/api/items", "/api/items/1"):
+    for path in ("/", "/architecture.svg", "/api/status", "/api/items", "/api/items/1"):
         assert client.get(path).status_code == 401
         assert client.get(path, auth=("admin", "wrong")).status_code == 401
     assert client.post("/api/run", json={}).status_code == 401
@@ -29,3 +29,12 @@ def test_everything_else_needs_the_login(client, monkeypatch):
 def test_no_password_disables_the_ui(client, monkeypatch):
     monkeypatch.setenv("SENTINEL_PASSWORD", "")
     assert client.get("/api/items", auth=("admin", "")).status_code == 503
+
+
+def test_architecture_tab_and_diagram(client, monkeypatch):
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    page = client.get("/", auth=("admin", "s3cret")).text
+    assert 'data-view="architecture"' in page and 'src="/architecture.svg"' in page
+    svg = client.get("/architecture.svg", auth=("admin", "s3cret"))
+    assert svg.status_code == 200 and svg.headers["content-type"].startswith("image/svg+xml")
+    assert "capabilities.yaml" in svg.text

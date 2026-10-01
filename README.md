@@ -4,16 +4,7 @@
 
 Every morning Sentinel reads the sources security teams actually follow (Zscaler ThreatLabz, OWASP GenAI, MITRE ATLAS, CISA KEV, agent-security researchers, and OSV for the framework's own dependencies). It compares each new threat with what K9-AIF already defends against, and sends the ones the framework doesn't fully cover to a human for review. Approved findings become a private draft security advisory, or an issue for public dependency CVEs, on the framework repository. Sentinel never changes code.
 
-```
- sources ──► CollectSquad ──► AssessSquad (one item per flow) ───────────► k9x-hil
- (feeds,       store new       screen (Shield + Guardian, labels only)      hil.requests.
-  OSV)         items            compare with the capability catalog         framework_security_updates
-                                triage → RequiresHIL                              │
-                                                                     reviewer decides
- GitHub ◄── DecisionSquad ◄── SentinelRouter.listen_for_hil_replies ◄────────────┘
- (draft advisory / issue,     (resume by correlation_id)
-  dry_run by default)
-```
+![What K9X Sentinel does](web/architecture.svg)
 
 ## What it compares against
 

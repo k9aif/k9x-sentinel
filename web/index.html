@@ -35,6 +35,14 @@
   .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; border:1px solid currentColor; }
   .gap { color:var(--gap); } .partial { color:var(--partial); } .covered { color:var(--covered); }
   .dependency { color:var(--dep); } .mute { color:var(--mute); }
+  nav.views { display:flex; gap:6px; }
+  nav.views button.on { border-color:var(--accent); color:var(--accent); }
+  .arch { padding:8px; background:#fff; }
+  .arch img { display:block; width:100%; min-width:900px; height:auto; }
+  .prose { margin-top:16px; max-width:900px; }
+  .prose h2 { font-size:16px; margin:4px 0 8px; }
+  .prose li { margin-bottom:8px; }
+  code { font-size:12.5px; }
   #detail { margin-top:16px; }
   #detail h2 { font-size:16px; margin:0 0 6px; }
   #detail dl { display:grid; grid-template-columns:170px 1fr; gap:6px 14px; margin:12px 0; }
@@ -49,11 +57,13 @@
 <header>
   <h1>K9X Sentinel</h1>
   <span class="sub">threat watch for the K9-AIF framework</span>
+  <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="architecture">Architecture</button></nav>
   <span class="spacer"></span>
   <span id="runstate" class="mute"></span>
   <button id="runbtn" class="primary">Run now</button>
 </header>
 <main>
+ <section id="view-findings">
   <div class="cards" id="cards"></div>
   <div class="tabs" id="tabs"></div>
   <div class="wrap"><table>
@@ -62,6 +72,22 @@
   </table></div>
   <div id="detail" class="card" hidden></div>
   <p class="note">Private. Findings describe gaps that may not be fixed yet: never expose this UI publicly.</p>
+ </section>
+ <section id="view-architecture" hidden>
+  <div class="wrap arch"><img src="/architecture.svg" alt="K9X Sentinel architecture: sources, the Sentinel pipeline, the K9-AIF framework, people and GitHub as horizontal lanes"></div>
+  <div class="card prose">
+   <h2>How a finding moves</h2>
+   <ol>
+    <li><b>Collect.</b> Every morning at 06:00 Sentinel reads the threat-intelligence feeds and asks OSV about every dependency k9-aif declares. Only new items are kept; items older than 14 days when a source is first seen are recorded as baseline and never assessed.</li>
+    <li><b>Screen.</b> Each article is checked by k9x Shield and Granite Guardian. Attack write-ups usually contain live injection examples, so the result is a <i>label</i> on the finding, not a block: hiding the article would hide the threat.</li>
+    <li><b>Compare.</b> The model reads the article next to the framework's capability catalog (<code>capabilities.yaml</code>, shipped in k9-aif) and answers <i>covered</i>, <i>partial</i>, <i>gap</i> or <i>not relevant</i>, with the OWASP ids, matching controls, severity, confidence, rationale and a suggested fix. It has no tools, and any id not in the catalog is discarded. Dependency findings skip this step: they are decided by version arithmetic alone.</li>
+    <li><b>Triage.</b> Only relevant gaps or partial gaps of at least medium severity and 0.5 confidence go further. An instance of a gap the maintainers already know about is recorded against it unless it is high severity or worse.</li>
+    <li><b>Raise.</b> Each finding is its own flow. The triage agent raises <code>RequiresHIL</code>; the orchestrator hands it to the framework's <code>BaseHILOrchestrator</code>, which publishes the case to k9x-hil.</li>
+    <li><b>Review.</b> A reviewer approves or rejects it in k9x-hil (or it expires after 14 days). The case carries only the finding number, verdict, severity and a link back here.</li>
+    <li><b>Act.</b> The framework's router receives the decision and resumes the same flow exactly once. From an approved reviewer, an approval becomes a private draft security advisory (technique gaps) or an issue (dependency floors) on k9-aif-framework; everything else is recorded. Sentinel never changes code.</li>
+   </ol>
+  </div>
+ </section>
 </main>
 <script>
 const TABS = [
@@ -156,6 +182,13 @@ document.getElementById("runbtn").addEventListener("click", async () => {
 });
 window.addEventListener("hashchange", route);
 function route() { const m = location.hash.match(/^#item-(\d+)$/); if (m) showItem(+m[1]); }
+
+document.querySelector("nav.views").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("nav.views button").forEach(x => x.classList.toggle("on", x === b));
+  document.getElementById("view-findings").hidden = b.dataset.view !== "findings";
+  document.getElementById("view-architecture").hidden = b.dataset.view !== "architecture";
+});
 
 drawTabs(); loadStatus(); loadItems(); route();
 setInterval(() => { loadStatus(); loadItems(); }, 15000);

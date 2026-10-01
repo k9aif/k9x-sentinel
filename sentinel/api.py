@@ -115,3 +115,8 @@ def run(body: RunRequest, _: str = Depends(login)):
 @app.get("/")
 def index(_: str = Depends(login)):
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/architecture.svg")
+def architecture(_: str = Depends(login)):
+    return FileResponse(WEB / "architecture.svg", media_type="image/svg+xml")
