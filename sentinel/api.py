@@ -4,7 +4,8 @@
 
 Everything except /api/health, the sign-in page and its assets needs the
 single login from .env (SENTINEL_USER / SENTINEL_PASSWORD): a signed session
-cookie from the sign-in page, or HTTP Basic for scripts (see auth.py). No
+cookie from the sign-in page, or HTTP Basic plus an X-Sentinel-Client header
+for scripts (see auth.py). No
 password set = the UI and API are disabled; the scheduler still runs.
 
 On start: the SQLite store, the daily scheduler, and (when KAFKA_BROKER is
@@ -31,6 +32,7 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 
 app = FastAPI(title="K9X Sentinel", docs_url=None, redoc_url=None, openapi_url=None)
 _basic = HTTPBasic(auto_error=False)   # no WWW-Authenticate: never the browser's own popup
+SCRIPT_HEADER = "X-Sentinel-Client"     # required with HTTP Basic (scripts: build-run.sh run, curl)
 
 
 def _client(request: Request) -> str:
@@ -43,7 +45,10 @@ def current_user(request: Request, basic: Optional[HTTPBasicCredentials] = Depen
     user = auth.verify(request.cookies.get(auth.COOKIE))
     if user:
         return user
-    if basic is not None:
+    # Basic auth is for scripts only, and they must say so. A browser that once
+    # used the old Basic popup keeps resending those credentials on its own;
+    # without this header they would sign it straight back in after Sign out.
+    if basic is not None and request.headers.get(SCRIPT_HEADER):
         addr = _client(request)
         if auth.locked(addr):
             raise HTTPException(429, "Too many failed sign-ins; try again in a few minutes")

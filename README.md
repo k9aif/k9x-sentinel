@@ -53,7 +53,7 @@ On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.
 
 Prerequisites: Ollama with the analysis model (`SENTINEL_MODEL`, default `qwen3.8:27b`) and `granite4.1-guardian:8b` (mandatory, fails closed); Kafka/Redpanda and k9x-hil with the *Framework Security Updates* queue (seeded by k9x-hil at start-up) for HIL.
 
-The UI has a sign-in page (signed, HttpOnly session cookie; 5 failed attempts lock an address for 5 minutes), the findings view, an Architecture tab and an About page for architects (`/about`, public: what Sentinel is, how it keeps K9-AIF current, what to do for an organization, setup). Scripts can still use HTTP Basic (`ubuntu/build-run.sh run`).
+The UI has a sign-in page (signed, HttpOnly session cookie; 5 failed attempts lock an address for 5 minutes), the findings view, an Architecture tab and an About page for architects (`/about`, public: what Sentinel is, how it keeps K9-AIF current, what to do for an organization, setup). Scripts can still use HTTP Basic with an `X-Sentinel-Client` header (`ubuntu/build-run.sh run`, or `curl -u admin:… -H 'X-Sentinel-Client: me'`); a browser's remembered Basic credentials are ignored.
 
 ## Layout
 

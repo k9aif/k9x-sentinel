@@ -71,7 +71,7 @@ case "$cmd" in
 
   run)
     user=$(env_get SENTINEL_USER); pass=$(env_get SENTINEL_PASSWORD)
-    curl -fsS -u "${user:-admin}:${pass}" -X POST -H 'Content-Type: application/json' -d '{}' \
+    curl -fsS -u "${user:-admin}:${pass}" -H 'X-Sentinel-Client: build-run.sh' -X POST -H 'Content-Type: application/json' -d '{}' \
       "http://localhost:${PORT}/api/run" && echo
     ;;
 

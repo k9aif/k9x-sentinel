@@ -6,6 +6,9 @@ from fastapi.testclient import TestClient
 from sentinel import api, runner
 
 
+SCRIPT = {"X-Sentinel-Client": "test"}
+
+
 @pytest.fixture
 def client(monkeypatch):
     from sentinel import auth
@@ -25,9 +28,9 @@ def test_everything_else_needs_the_login(client, monkeypatch):
     for path in ("/api/status", "/api/items", "/api/items/1"):
         r = client.get(path)
         assert r.status_code == 401 and "www-authenticate" not in r.headers   # never the browser popup
-        assert client.get(path, auth=("admin", "wrong")).status_code == 401
+        assert client.get(path, auth=("admin", "wrong"), headers=SCRIPT).status_code == 401
     assert client.post("/api/run", json={}).status_code == 401
-    assert client.get("/api/items", auth=("admin", "s3cret")).status_code == 200
+    assert client.get("/api/items", auth=("admin", "s3cret"), headers=SCRIPT).status_code == 200
 
 
 def test_no_password_disables_the_ui(client, monkeypatch):
@@ -76,3 +79,15 @@ def test_repeated_failures_lock_the_address(client, monkeypatch):
         client.post("/api/login", json={"username": "admin", "password": "bad"})
     r = client.post("/api/login", json={"username": "admin", "password": "s3cret"})
     assert r.status_code == 429
+
+
+def test_sign_out_wins_over_remembered_browser_basic_credentials(client, monkeypatch):
+    """A browser that used the old Basic popup resends those credentials by
+    itself. Without the script header they must not sign it back in."""
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    client.post("/api/logout")
+    page = client.get("/", auth=("admin", "s3cret"))
+    assert "SIGN IN TO K9X SENTINEL" in page.text
+    assert client.get("/api/items", auth=("admin", "s3cret")).status_code == 401
+    assert client.get("/api/items", auth=("admin", "s3cret"), headers=SCRIPT).status_code == 200

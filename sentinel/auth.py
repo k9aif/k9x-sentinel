@@ -5,7 +5,9 @@
     session cookie  "<user>|<expiry>|<HMAC-SHA256>"  HttpOnly, SameSite=Strict, 12 h
                     signed with SENTINEL_SESSION_SECRET, or a random per-process
                     secret (sessions then end when the server restarts)
-    HTTP Basic      still accepted, for scripts (build-run.sh run, curl -u)
+    HTTP Basic      scripts only, with an X-Sentinel-Client header (build-run.sh run,
+                    curl -u ... -H 'X-Sentinel-Client: me'); a browser's remembered
+                    Basic credentials are ignored, so Sign out really signs out
     lockout         5 failed sign-ins from one address -> 5 minutes refused
 
 Changing SENTINEL_PASSWORD ends every session (the password is part of the key)."""
