@@ -22,7 +22,7 @@ import threading
 import time
 from typing import Dict, List, Optional
 
-from sentinel.settings import credentials
+from sentinel.settings import accounts, credentials
 
 COOKIE = "k9x_sentinel_session"
 TTL_S = 12 * 3600
@@ -36,15 +36,19 @@ _lock = threading.Lock()
 
 def _key() -> bytes:
     base = os.environ.get("SENTINEL_SESSION_SECRET", "").encode() or _PROCESS_SECRET
-    return hashlib.sha256(base + b"|" + credentials()["password"].encode()).digest()
+    pw = "|".join(f"{u}:{a['password']}" for u, a in sorted(accounts().items()))
+    return hashlib.sha256(base + b"|" + pw.encode()).digest()
 
 
 def check_password(user: str, password: str) -> bool:
-    want = credentials()
-    if not want["password"]:
-        return False
-    return secrets.compare_digest(user.encode(), want["user"].encode()) & \
-        secrets.compare_digest(password.encode(), want["password"].encode())
+    acct = accounts().get(user)
+    want = acct["password"] if acct else secrets.token_hex(16)   # same work for unknown users
+    return bool(acct) & secrets.compare_digest(password.encode(), want.encode())
+
+
+def role(user: Optional[str]) -> Optional[str]:
+    acct = accounts().get(user or "")
+    return acct["role"] if acct else None
 
 
 def issue(user: str, now: Optional[float] = None) -> str:
@@ -66,7 +70,7 @@ def verify(token: Optional[str], now: Optional[float] = None) -> Optional[str]:
     good = hmac.new(_key(), f"{user}|{exp}".encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, good) or exp_i < (now or time.time()):
         return None
-    return user if secrets.compare_digest(user.encode(), credentials()["user"].encode()) else None
+    return user if user in accounts() else None
 
 
 def locked(addr: str, now: Optional[float] = None) -> float:

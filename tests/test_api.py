@@ -111,3 +111,74 @@ def test_live_activity_feed(client, monkeypatch):
     assert [e["msg"] for e in d["events"]] == ["Connecting to OSV …", "verdict: gap · high · confidence 0.9"]
     assert d["current"]["stage"] == "compare" and d["current"]["item"] == 7
     assert client.get(f"/api/activity?since={d['current']['last_seq']}").json()["events"] == []
+
+
+
+@pytest.fixture
+def demo_on(monkeypatch):
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    monkeypatch.setenv("SENTINEL_DEMO_USER", "demo")
+    monkeypatch.setenv("SENTINEL_DEMO_PASSWORD", "demo")
+
+
+def _seed():
+    from sentinel import store
+    gap = store.add_item({"uid": "d:1", "source": "willison_prompt_injection", "kind": "article",
+                          "title": "Secret technique X", "link": "https://example.com/x"})
+    store.update_item(gap, verdict="gap", severity="high", status="pending_hil", correlation_id="c-x",
+                      assessment={"verdict": "gap", "severity": "high", "threat": "how X works",
+                                  "suggested_fix": "add check Y", "rationale": "no control"},
+                      content="full article about X")
+    store.audit("raised_to_hil", gap, correlation_id="c-x", priority="high")
+    cov = store.add_item({"uid": "d:2", "source": "owasp_genai", "kind": "article", "title": "Known injection"})
+    store.update_item(cov, verdict="covered", severity="medium", status="assessed",
+                      assessment={"verdict": "covered", "rationale": "Shield + Guardian stop it"})
+    return gap, cov
+
+
+def test_demo_login_is_shown_and_read_only(client, demo_on):
+    assert client.get("/api/public").json() == {"demo": {"user": "demo", "password": "demo"}}
+    assert client.post("/api/login", json={"username": "demo", "password": "demo"}).status_code == 200
+    assert client.get("/api/me").json() == {"user": "demo", "role": "viewer"}
+    assert client.post("/api/run", json={}).status_code == 403
+    assert client.get("/api/audit.csv").status_code == 403
+    assert client.get("/api/status").json()["database"]["where"] == "hidden"
+
+
+def test_demo_never_sees_an_open_gap(client, demo_on):
+    gap, cov = _seed()
+    client.post("/api/login", json={"username": "demo", "password": "demo"})
+    rows = {r["id"]: r for r in client.get("/api/items").json()}
+    assert rows[gap]["title"] == "Finding under private review" and rows[gap]["verdict"] == "gap"
+    assert rows[cov]["title"] == "Known injection"                                     # covered: shown
+    body = client.get(f"/api/items/{gap}").text
+    for secret in ("Secret technique X", "how X works", "add check Y", "full article", "example.com/x"):
+        assert secret not in body
+    assert "Shield + Guardian stop it" in client.get(f"/api/items/{cov}").text
+    assert client.get(f"/api/items/{gap}/audit").json() == []
+    hil = client.get("/api/hil").text
+    assert "Secret technique X" not in hil and "under private review" in hil
+
+
+def test_demo_live_log_hides_titles(client, demo_on):
+    from sentinel import activity
+    start = activity.current()["last_seq"]
+    activity.emit("screen", "#9 Secret technique X", item=9)
+    activity.emit("compare", "verdict: gap · high · confidence 0.9 · controls: shield.prompt_injection", "error", item=9)
+    client.post("/api/login", json={"username": "demo", "password": "demo"})
+    msgs = [e["msg"] for e in client.get(f"/api/activity?since={start}").json()["events"]]
+    assert msgs == ["screening an item with Shield + Guardian", "verdict: gap · high · confidence 0.9"]
+
+
+def test_admin_still_sees_everything(client, demo_on):
+    gap, _ = _seed()
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    assert client.get("/api/me").json()["role"] == "admin"
+    assert "Secret technique X" in client.get(f"/api/items/{gap}").text
+
+
+def test_demo_off_by_default(client, monkeypatch):
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    monkeypatch.setenv("SENTINEL_DEMO_PASSWORD", "")
+    assert client.get("/api/public").json() == {"demo": None}
+    assert client.post("/api/login", json={"username": "demo", "password": ""}).status_code == 401

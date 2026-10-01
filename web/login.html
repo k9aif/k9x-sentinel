@@ -64,6 +64,9 @@
   button.go:disabled { filter: grayscale(.4) brightness(.8); cursor: default; }
   button.go svg { width: 17px; height: 17px; }
   .err { min-height: 18px; margin: 10px 0 0; text-align: center; color: #fca5a5; font-size: 13px; }
+  .demo { margin: 0 0 10px; padding: 7px 10px; text-align: center; font-size: 12.5px; color: #d8dbe8;
+          border: 1px dashed rgba(160,150,220,.35); border-radius: 7px; background: rgba(124,92,255,.08); }
+  .demo b { color: #fff; font-weight: 600; }
   .foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; color: var(--mute); font-size: 11.5px; text-align: center; }
   .foot svg { width: 12px; height: 12px; flex: none; }
   .meta { margin-top: 18px; color: #5d6378; font-size: 11px; text-align: center; }
@@ -103,6 +106,7 @@
       <span>Sign in</span>
     </button>
     <p class="err" id="err" role="alert"></p>
+    <div class="demo" id="demo" hidden>Demo (read-only): <b id="demou"></b> / <b id="demop"></b></div>
     <div class="foot">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
       Secure access to K9-AIF threat intelligence
@@ -130,6 +134,12 @@ f.addEventListener("submit", async e => {
   } catch (_) { err.textContent = "Can't reach Sentinel. Is the server running?"; }
   go.disabled = false;
 });
+fetch("/api/public").then(r => r.json()).then(p => {
+  if (!p.demo) return;
+  document.getElementById("demou").textContent = p.demo.user;
+  document.getElementById("demop").textContent = p.demo.password;
+  document.getElementById("demo").hidden = false;
+}).catch(() => {});
 const eye = document.getElementById("eye");
 eye.addEventListener("click", () => {
   const show = f.password.type === "password";

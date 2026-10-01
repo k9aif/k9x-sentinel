@@ -91,6 +91,7 @@
   .badge.gap { background:var(--gap); color:#fff; }
   .badge.partial { background:var(--partial); color:#111; }
   .badge.raised { background:var(--accent); color:#fff; }
+  .console:empty { display:none; }
   .console { height:210px; overflow-y:auto; background:#0b0d14; color:#cfd6e6; border-radius:8px; padding:8px 10px;
              font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .console .t { color:#6b7489; margin-right:8px; }
@@ -198,7 +199,7 @@ async function loadStatus() {
     card("Pipeline", `${esc(s.settings.model)} · HIL ${s.settings.hil ? esc(s.settings.hil_detail) : "off"} · GitHub ${esc(s.settings.github_mode)}`) +
     card("Database", `${esc(s.database.dialect === "postgresql" ? "PostgreSQL" : "SQLite (local file)")}${s.database.schema ? " · " + esc(s.database.schema) : ""}<div class="note">${esc(s.database.where)}</div>`);
   document.getElementById("runstate").textContent = s.state.running ? `running: ${s.state.phase}${s.state.item ? " · item " + s.state.item : ""}` : "";
-  document.getElementById("runbtn").disabled = s.state.running;
+  if (document.getElementById("runbtn")) document.getElementById("runbtn").disabled = s.state.running;
   if (s.state.running && document.getElementById("live").hidden && !liveTimer) { showLive(true); pollLive(); }
 }
 
@@ -225,6 +226,7 @@ async function showItem(id) {
   box.hidden = false;
   box.innerHTML = `
     <h2>#${it.id} · ${esc(it.title)}</h2>
+    ${it.redacted ? '<p class="note">This finding is under private review: it may describe a weakness that is not fixed yet, so its details are visible to the maintainers only.</p>' : ""}
     <div>${pill(it.kind === "dependency" ? "dependency" : a.verdict)} <span class="mute">${esc(it.status)}</span>
       ${it.link ? ` · <a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</div>
     <dl>
@@ -399,7 +401,11 @@ async function initLive() {
     SOURCES = s.sources || [];
     for (const [src, c] of Object.entries(s.by_source || {})) srcCount[src] = {gap: c.gap, partial: c.partial, raised: c.raised};
     drawChips(); drawPipe(null, "", false);
-    if (!s.state.running) showLive(Object.values(s.by_source || {}).some(c => c.gap || c.partial || c.raised));
+    if (!s.state.running) {
+      document.getElementById("livetitle").textContent = "Findings by source";
+      document.getElementById("livephase").textContent = "click a source to see its findings";
+      showLive(Object.values(s.by_source || {}).some(c => c.gap || c.partial || c.raised));
+    }
     if (s.state.running) { showLive(true); pollLive(); }
   } catch (_) {}
 }
@@ -419,7 +425,17 @@ document.querySelector("nav.views").addEventListener("click", e => {
   if (b.dataset.view === "hil") loadHil();
 });
 
-drawTabs(); loadStatus(); loadItems(); route(); initLive();
+let ROLE = "admin";
+async function initRole() {
+  try { ROLE = (await api("/api/me")).role; } catch (_) { return; }
+  if (ROLE !== "admin") {
+    document.getElementById("runbtn").remove();
+    document.querySelectorAll('a[href="/api/audit.csv"]').forEach(a => a.remove());
+    document.querySelector("header .spacer").insertAdjacentHTML("afterend",
+      '<span class="pill" title="Read-only. Gaps under private review are hidden.">demo · read-only</span>');
+  }
+}
+drawTabs(); initRole(); loadStatus(); loadItems(); route(); initLive();
 setInterval(() => { loadStatus(); loadItems(); }, 15000);
 </script>
 </body>

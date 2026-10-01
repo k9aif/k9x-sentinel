@@ -121,9 +121,28 @@ def catalog_path() -> str:
 
 
 def credentials() -> Dict[str, str]:
-    """Single login. No password configured = UI disabled (health only)."""
+    """The admin login. No password configured = UI disabled (health only)."""
     return {"user": os.environ.get("SENTINEL_USER", "admin"),
             "password": os.environ.get("SENTINEL_PASSWORD", "")}
+
+
+def demo_credentials() -> Dict[str, str]:
+    """Optional read-only viewer (SENTINEL_DEMO_PASSWORD set = enabled). Shown on
+    the sign-in page. Never sees an open gap (see api.redact_item)."""
+    return {"user": os.environ.get("SENTINEL_DEMO_USER", "demo"),
+            "password": os.environ.get("SENTINEL_DEMO_PASSWORD", "")}
+
+
+def accounts() -> Dict[str, Dict[str, str]]:
+    """{user: {password, role}} for every enabled login; role admin | viewer."""
+    out: Dict[str, Dict[str, str]] = {}
+    demo = demo_credentials()
+    if demo["password"]:
+        out[demo["user"]] = {"password": demo["password"], "role": "viewer"}
+    admin = credentials()
+    if admin["password"]:
+        out[admin["user"]] = {"password": admin["password"], "role": "admin"}
+    return out
 
 
 def db_mode() -> str:

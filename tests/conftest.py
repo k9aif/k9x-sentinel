@@ -19,6 +19,7 @@ os.environ["SENTINEL_GITHUB_TOKEN"] = ""
 os.environ["SENTINEL_HIL_DETAIL"] = "minimal"
 os.environ["SENTINEL_HIL_APPROVERS"] = ""
 os.environ["SENTINEL_PASSWORD"] = ""
+os.environ["SENTINEL_DEMO_PASSWORD"] = ""
 os.environ["SENTINEL_CATALOG_PATH"] = ""
 os.environ["SENTINEL_PUBLIC_URL"] = "http://localhost:8114"
 

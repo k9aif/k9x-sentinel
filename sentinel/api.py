@@ -25,8 +25,8 @@ from pydantic import BaseModel
 
 from sentinel import activity, auth, catalog, runner, store
 from sentinel.router.sentinel_router import get_router
-from sentinel.settings import (REPO_URL, analysis_model, credentials, github, hil_detail, hil_overdue_days, kafka_broker,
-                               run_at)
+from sentinel.settings import (REPO_URL, analysis_model, credentials, demo_credentials, github, hil_detail,
+                               hil_overdue_days, kafka_broker, run_at)
 
 log = logging.getLogger(__name__)
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -66,6 +66,40 @@ def login(user: Optional[str] = Depends(current_user)) -> str:
     return user
 
 
+def admin(user: str = Depends(login)) -> str:
+    if auth.role(user) != "admin":
+        raise HTTPException(403, "Read-only demo account")
+    return user
+
+
+def viewer(user: str) -> bool:
+    return auth.role(user) != "admin"
+
+
+# ── redaction for viewers ──
+# A gap or partial gap in a technique finding describes a weakness that may not be
+# fixed yet. Viewers (the demo login) see that it exists, its verdict, severity and
+# source, never what it is. Dependency findings are public CVEs and shown in full.
+HIDDEN = "Finding under private review"
+
+
+def sensitive(item: dict) -> bool:
+    return item.get("kind") != "dependency" and item.get("verdict") in ("gap", "partial")
+
+
+def redact_item(item: dict) -> dict:
+    if not sensitive(item):
+        return item
+    out = {k: item.get(k) for k in ("id", "source", "kind", "published", "first_seen", "status", "verdict",
+                                    "severity", "updated")}
+    out.update(title=HIDDEN, link=None, redacted=True)
+    if "assessment" in item:
+        a = item.get("assessment") or {}
+        out["assessment"] = {"verdict": a.get("verdict"), "severity": a.get("severity"),
+                             "framework_version": a.get("framework_version")}
+    return out
+
+
 async def _listen_for_replies() -> None:
     router = get_router()
     delay = 5
@@ -94,7 +128,7 @@ def health():
 
 
 @app.get("/api/status")
-def status(_: str = Depends(login)):
+def status(user: str = Depends(login)):
     try:
         cat = catalog.load()
         cat_info = {"origin": cat.get("_origin"), "framework_version": cat.get("framework_version"),
@@ -106,7 +140,7 @@ def status(_: str = Depends(login)):
             "settings": {"model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
                          "hil_detail": hil_detail(), "github_mode": gh["mode"], "github_repo": gh["repo"],
                          "github_token": bool(gh["token"])},
-            "database": store.backend(),
+            "database": {**store.backend(), "where": "hidden"} if viewer(user) else store.backend(),
             "by_source": store.source_counts(),
             "sources": [{"id": src["id"], "name": src.get("name", src["id"])} for src in get_router().config["sentinel"]["sources"]],
             "repo": REPO_URL}
@@ -114,32 +148,57 @@ def status(_: str = Depends(login)):
 
 @app.get("/api/items")
 def items(status: Optional[str] = None, verdict: Optional[str] = None, source: Optional[str] = None,
-          limit: int = 200, _: str = Depends(login)):
-    return store.list_items(status=status, verdict=verdict, source=source, limit=max(1, min(limit, 1000)))
+          limit: int = 200, user: str = Depends(login)):
+    rows = store.list_items(status=status, verdict=verdict, source=source, limit=max(1, min(limit, 1000)))
+    return [redact_item(r) for r in rows] if viewer(user) else rows
 
 
 @app.get("/api/items/{item_id}")
-def item(item_id: int, _: str = Depends(login)):
+def item(item_id: int, user: str = Depends(login)):
     found = store.get_item(item_id)
     if not found:
         raise HTTPException(404, "not found")
-    return found
+    return redact_item(found) if viewer(user) else found
 
 
 @app.get("/api/activity")
-def live(since: int = 0, _: str = Depends(login)):
+def live(since: int = 0, user: str = Depends(login)):
+    events = activity.since(since)
+    if viewer(user):   # item titles and analyses never reach a viewer, even mid-run
+        generic = {"screen": "screening an item with Shield + Guardian", "compare": "comparing an item with the catalog",
+                   "triage": "triage", "hil": "a finding was sent for human review", "decision": "a reviewer decided"}
+        events = [{**e, "msg": (e["msg"].split(" · controls")[0] if e["msg"].startswith("verdict:") else generic[e["stage"]])}
+                  if e["stage"] in generic else e for e in events]
     return {"running": runner.STATE["running"], "phase": runner.STATE["phase"],
-            "current": activity.current(), "events": activity.since(since)}
+            "current": activity.current(), "events": events}
+
+
+@app.get("/api/me")
+def me(user: str = Depends(login)):
+    return {"user": user, "role": auth.role(user)}
+
+
+@app.get("/api/public")
+def public_info():
+    """For the sign-in page: the demo login, when one is enabled."""
+    demo = demo_credentials()
+    return {"demo": {"user": demo["user"], "password": demo["password"]} if demo["password"] else None}
 
 
 @app.get("/api/items/{item_id}/audit")
-def item_audit(item_id: int, _: str = Depends(login)):
+def item_audit(item_id: int, user: str = Depends(login)):
+    if viewer(user) and sensitive(store.get_item(item_id) or {}):
+        return []
     return store.item_audit(item_id)
 
 
 @app.get("/api/hil")
-def hil_history(_: str = Depends(login)):
-    return {"overdue_days": hil_overdue_days(), "cases": store.hil_history(hil_overdue_days())}
+def hil_history(user: str = Depends(login)):
+    cases = store.hil_history(hil_overdue_days())
+    if viewer(user):
+        cases = [{**c, "title": HIDDEN, "link": None, "comment": None, "redacted": True} if sensitive(c) else c
+                 for c in cases]
+    return {"overdue_days": hil_overdue_days(), "cases": cases}
 
 
 @app.get("/api/audit/verify")
@@ -148,7 +207,7 @@ def audit_verify(_: str = Depends(login)):
 
 
 @app.get("/api/audit.csv")
-def audit_csv(request: Request, user: str = Depends(login)):
+def audit_csv(request: Request, user: str = Depends(admin)):
     import csv
     import io
     import json as _json
@@ -175,7 +234,7 @@ class RunRequest(BaseModel):
 
 
 @app.post("/api/run")
-def run(body: RunRequest, request: Request, user: str = Depends(login)):
+def run(body: RunRequest, request: Request, user: str = Depends(admin)):
     store.audit("run_requested", actor=user, address=_client(request), sources=body.sources or "all")
     if not runner.run_in_background(body.sources or None):
         raise HTTPException(409, "a run is already in progress")
@@ -200,7 +259,7 @@ def sign_in(body: SignIn, request: Request):
         store.audit("sign_in_failed", actor=body.username.strip()[:100] or "?", address=addr)
         raise HTTPException(401, "Wrong username or password")
     auth.record_success(addr)
-    store.audit("signed_in", actor=body.username.strip(), address=addr)
+    store.audit("signed_in", actor=body.username.strip(), address=addr, role=auth.role(body.username.strip()))
     resp = JSONResponse({"ok": True})
     resp.set_cookie(auth.COOKIE, auth.issue(body.username.strip()), max_age=auth.TTL_S, httponly=True,
                     samesite="lax", secure=request.url.scheme == "https", path="/")
