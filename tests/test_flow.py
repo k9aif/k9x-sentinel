@@ -231,3 +231,18 @@ def test_resend_after_kafka_outage_reuses_the_assessment(shield_only, model, mon
     out = build(bus).route({"event_type": "sentinel.assess", "item_id": item_id})
     assert out["status"] == "pending_hil" and len(bus.sent) == 1
     assert len(calls) == 1                                    # no second model call
+
+
+
+def test_prefilter_ignores_user_agent_headers_and_marketing_footers():
+    from sentinel.agents.assess_agents import prefilter_match
+    from sentinel.settings import load_config
+    src = next(s for s in load_config()["sentinel"]["sources"] if s["id"] == "threatlabz")
+    terms, ignore, n = src["prefilter"], src["prefilter_ignore"], src["prefilter_chars"]
+    malware = "Loader sends User-Agent: Mozilla/5.0 and the custom User-Agent SmartUploader."
+    footer = ("Vidar adds new ciphers. " + "x" * 800 +
+              " Zscaler helps with a cloud native, AI-powered zero trust architecture.")
+    assert prefilter_match("2CLoader\n" + malware[:n], terms, ignore) is None
+    assert prefilter_match("Vidar update\n" + footer[:n], terms, ignore) is None
+    assert prefilter_match("Attackers hijack an AI agent through MCP tools\n...", terms, ignore) == "ai"
+    assert prefilter_match("Phishing kit\nThe kit uses an LLM to write lures.", terms, ignore) == "llm"

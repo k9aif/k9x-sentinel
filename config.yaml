@@ -34,6 +34,12 @@ sentinel:
                             chatbot, chatbots, copilot, "prompt injection", jailbreak, mcp, "model context protocol",
                             rag, "retrieval-augmented", openai, chatgpt, anthropic, claude, gemini, deepseek,
                             "machine learning", "artificial intelligence", deepfake, deepfakes]
+      # Only the title and the opening of the summary count: these posts end with a
+      # marketing footer ("AI-powered zero trust architecture") on every post.
+      prefilter_chars: 600
+      # Phrases that contain a term but are not about AI agents.
+      prefilter_ignore: [user-agent, "user agent", useragent, ai-powered, "ai powered", "powered by ai",
+                         "zscaler ai", "zero trust exchange"]
     - id: owasp_genai
       name: OWASP GenAI Security Project
       kind: rss

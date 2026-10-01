@@ -74,9 +74,12 @@ rationale, suggested_fix.
 
 
 # ── PrefilterAgent ──────────────────────────────────────────────────────────
-def prefilter_match(text: str, terms: List[str]) -> Optional[str]:
-    """First term found as a whole word (case-insensitive), else None."""
+def prefilter_match(text: str, terms: List[str], ignore: Optional[List[str]] = None) -> Optional[str]:
+    """First term found as a whole word (case-insensitive), else None. Phrases
+    in ``ignore`` (e.g. "user-agent", a marketing "ai-powered") are removed first."""
     low = (text or "").lower()
+    for phrase in ignore or []:
+        low = low.replace(phrase.lower(), " ")
     for term in terms:
         if re.search(r"(?<![a-z0-9])" + re.escape(term.lower()) + r"(?![a-z0-9])", low):
             return term
@@ -96,7 +99,8 @@ class PrefilterAgent(SentinelAgent):
         terms = src.get("prefilter") or []
         if not terms or item["kind"] == "dependency":
             return {"relevant": True, "why": "source is always assessed"}
-        hit = prefilter_match(f"{item['title']}\n{item.get('summary') or ''}", terms)
+        lede = (item.get("summary") or "")[: int(src.get("prefilter_chars", 600))]
+        hit = prefilter_match(f"{item['title']}\n{lede}", terms, src.get("prefilter_ignore"))
         if hit:
             return {"relevant": True, "why": f"mentions '{hit}'"}
         why = "no AI / agent terms in title or summary (pre-filter, no model call)"
