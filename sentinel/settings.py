@@ -19,6 +19,19 @@ from k9_aif_abb.k9_utils.config_loader import load_yaml
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
+
+def _unquote_env() -> None:
+    """`podman run --env-file` passes values literally, quotes included
+    (POSTGRES_PASSWORD='x' arrives as "'x'"), while python-dotenv (./run.sh)
+    strips them. Strip one pair of matching surrounding quotes so the same
+    .env works both ways."""
+    for key, value in list(os.environ.items()):
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            os.environ[key] = value[1:-1]
+
+
+_unquote_env()
+
 SEVERITIES = ["low", "medium", "high", "critical"]
 REPO_URL = "https://github.com/k9aif/k9x-sentinel"
 

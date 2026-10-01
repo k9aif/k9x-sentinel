@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 # Pinned before sentinel.settings loads the developer's .env (load_dotenv never
 # overrides a variable that is already set), so tests don't depend on it.
 os.environ["K9_ENV"] = "development"
+os.environ["SENTINEL_DB"] = "sqlite"            # never the real database
 os.environ["KAFKA_BROKER"] = ""
 os.environ["SENTINEL_GITHUB_MODE"] = "dry_run"
 os.environ["SENTINEL_GITHUB_TOKEN"] = ""

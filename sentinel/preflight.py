@@ -46,6 +46,14 @@ def check() -> List[Tuple[str, str]]:
                         f"{len(cat['capabilities'])} controls ({cat['_origin']})"))
     except Exception as exc:
         out.append((FAIL, f"capability catalog unreadable: {exc}"))
+    try:
+        from sentinel import store
+        store.init()
+        db = store.backend()
+        out.append((OK, f"database: {db['dialect']}{' · schema ' + db['schema'] if db['schema'] else ''} · {db['where']}"))
+    except Exception as exc:
+        first = str(exc).strip().splitlines()[0][:200]
+        out.append((FAIL, f"database unreachable ({first}). Check SENTINEL_DB / POSTGRES_* in .env"))
     out.append((OK, f"Kafka {kafka_broker()}: HIL cases enabled") if kafka_broker() else
                (WARN, "KAFKA_BROKER not set: findings stay in Sentinel's UI, no HIL cases"))
     if kafka_broker() and not hil_approvers():

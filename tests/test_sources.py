@@ -63,3 +63,16 @@ def test_kev_keywords_match_whole_words_only():
             b' "dateAdded": "2026-09-02"}]}')
     items = sources.parse_kev(body, "cisa_kev", ["ai", "ollama"])
     assert [i["data"]["cve"] for i in items] == ["CVE-2"]
+
+
+def test_quoted_env_values_from_podman_env_file_are_unquoted(monkeypatch):
+    """podman --env-file keeps quotes; python-dotenv strips them. Both must work."""
+    from sentinel import settings
+    monkeypatch.setenv("POSTGRES_PASSWORD", "'s3cret!'")
+    monkeypatch.setenv("SENTINEL_PASSWORD", '"admin!pw"')
+    monkeypatch.setenv("SENTINEL_DEMO_PASSWORD", "demo")
+    monkeypatch.setenv("OTHER", "it's")
+    settings._unquote_env()
+    import os
+    assert os.environ["POSTGRES_PASSWORD"] == "s3cret!" and os.environ["SENTINEL_PASSWORD"] == "admin!pw"
+    assert os.environ["SENTINEL_DEMO_PASSWORD"] == "demo" and os.environ["OTHER"] == "it's"
