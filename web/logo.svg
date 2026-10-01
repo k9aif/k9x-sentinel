@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 136" width="120" height="136">
+  <title>K9X Sentinel</title>
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a855f7"/><stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="paw" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path d="M60 6 L108 24 V64 C108 96 86 118 60 130 C34 118 12 96 12 64 V24 Z"
+        fill="#0d0b1a" stroke="url(#edge)" stroke-width="5" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M60 17 L98 31.5 V64 C98 90 80 108 60 118 C40 108 22 90 22 64 V31.5 Z"
+        fill="none" stroke="url(#edge)" stroke-opacity=".35" stroke-width="1.5"/>
+  <g fill="url(#paw)" filter="url(#glow)">
+    <ellipse cx="41" cy="54" rx="7.5" ry="10" transform="rotate(-18 41 54)"/>
+    <ellipse cx="53.5" cy="42" rx="7.5" ry="10.5" transform="rotate(-6 53.5 42)"/>
+    <ellipse cx="66.5" cy="42" rx="7.5" ry="10.5" transform="rotate(6 66.5 42)"/>
+    <ellipse cx="79" cy="54" rx="7.5" ry="10" transform="rotate(18 79 54)"/>
+    <path d="M60 62 C70 62 82 74 82 85 C82 94 75 98 68 96 C64 95 62 93 60 93 C58 93 56 95 52 96 C45 98 38 94 38 85 C38 74 50 62 60 62 Z"/>
+  </g>
+</svg>

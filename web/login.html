@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K9X Sentinel — Sign in</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; --violet:#a855f7; --cyan:#38bdf8; --ink:#e7e9f3; --mute:#9aa1b8; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: #05060c; color: var(--ink); overflow-x: hidden;
+         font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  canvas#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  .floor { position: fixed; left: 0; right: 0; bottom: 0; height: 38vh; z-index: 0; pointer-events: none;
+           background-image: linear-gradient(rgba(120,140,255,.10) 1px, transparent 1px),
+                             linear-gradient(90deg, rgba(120,140,255,.10) 1px, transparent 1px);
+           background-size: 56px 56px; transform: perspective(420px) rotateX(62deg); transform-origin: bottom;
+           mask-image: linear-gradient(to top, rgba(0,0,0,.9), transparent); -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.9), transparent); }
+  main { position: relative; z-index: 1; min-height: 100%; width: 100%; display: flex; flex-direction: column;
+         align-items: center; justify-content: center; padding: 32px 16px 40px; }
+  .logo { width: 104px; height: auto; filter: drop-shadow(0 0 18px rgba(168,85,247,.55)); }
+  h1 { margin: 10px 0 0; font: 800 clamp(26px, 8.2vw, 92px)/1.05 Orbitron, "Segoe UI", system-ui, sans-serif;
+       letter-spacing: .02em; text-align: center;
+       background: linear-gradient(90deg, #9b5cf6 0%, #c4a1ff 45%, #7dd3fc 72%, #38bdf8 100%);
+       -webkit-background-clip: text; background-clip: text; color: transparent;
+       filter: drop-shadow(0 0 22px rgba(124,92,255,.35)); }
+  .tag { display: flex; align-items: center; gap: 14px; margin: 14px 0 34px; color: #d4d8e8;
+         font-size: clamp(14px, 2vw, 19px); letter-spacing: .06em; text-align: center; }
+  .tag::before, .tag::after { content: ""; width: clamp(30px, 12vw, 130px); height: 2px; border-radius: 2px; }
+  main > * { max-width: 100%; }
+  @media (max-width: 520px) { .tag::before, .tag::after { display: none; } .tag { font-size: 14px; letter-spacing: .03em; }
+                              .card h2 { letter-spacing: .18em; font-size: 13px; } }
+  .tag::before { background: linear-gradient(90deg, transparent, var(--violet)); box-shadow: 0 0 8px var(--violet); }
+  .tag::after { background: linear-gradient(90deg, var(--cyan), transparent); box-shadow: 0 0 8px var(--cyan); }
+  .card { width: min(560px, 100%); padding: 30px clamp(20px, 5vw, 38px) 26px; border-radius: 18px;
+          background: linear-gradient(180deg, rgba(28,26,44,.72), rgba(14,14,24,.78));
+          border: 1px solid rgba(160,150,220,.22); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+          box-shadow: 0 24px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05); }
+  .card h2 { margin: 0; text-align: center; font: 500 15px/1 Inter, system-ui, sans-serif; letter-spacing: .32em; color: #e9e6f7; }
+  .rule { position: relative; height: 1px; margin: 18px 0 22px;
+          background: linear-gradient(90deg, transparent, rgba(168,85,247,.6), transparent); }
+  .rule::after { content: ""; position: absolute; left: 50%; top: -3px; width: 7px; height: 7px; margin-left: -3.5px;
+                 border-radius: 50%; background: var(--violet); box-shadow: 0 0 10px var(--violet); }
+  label { display: block; margin: 0 0 8px; font-size: 12.5px; letter-spacing: .14em; color: var(--mute); text-transform: uppercase; }
+  .field { position: relative; margin-bottom: 18px; }
+  .field svg.ic { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: #a7adc2; }
+  input { width: 100%; height: 52px; padding: 0 48px 0 50px; border-radius: 10px; font: inherit; color: var(--ink);
+          background: rgba(8,9,16,.7); border: 1px solid rgba(160,170,210,.18); outline: none; transition: border-color .15s, box-shadow .15s; }
+  input::placeholder { color: #6f7690; }
+  input:focus { border-color: rgba(168,85,247,.7); box-shadow: 0 0 0 3px rgba(168,85,247,.18); }
+  .eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px;
+         display: grid; place-items: center; border: 0; background: none; color: #a7adc2; cursor: pointer; border-radius: 8px; }
+  .eye:hover { color: #fff; } .eye:focus-visible { outline: 2px solid var(--violet); }
+  .eye svg { width: 22px; height: 22px; }
+  button.go { width: 100%; height: 54px; margin-top: 6px; border: 0; border-radius: 10px; cursor: pointer;
+              display: flex; align-items: center; justify-content: center; gap: 10px; font: 600 17px Inter, system-ui, sans-serif; color: #fff;
+              background: linear-gradient(90deg, #7c3aed, #9b5cf6 55%, #7c3aed);
+              box-shadow: 0 0 24px rgba(139,92,246,.45), inset 0 1px 0 rgba(255,255,255,.25); transition: filter .15s, transform .05s; }
+  button.go:hover { filter: brightness(1.1); } button.go:active { transform: translateY(1px); }
+  button.go:disabled { filter: grayscale(.4) brightness(.8); cursor: default; }
+  button.go svg { width: 22px; height: 22px; }
+  .err { min-height: 20px; margin: 12px 0 0; text-align: center; color: #fca5a5; font-size: 14px; }
+  .foot { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; color: var(--mute); font-size: 13.5px; text-align: center; }
+  .foot svg { width: 15px; height: 15px; flex: none; }
+  .meta { margin-top: 26px; color: #6f7690; font-size: 12.5px; text-align: center; }
+  .meta a { color: #8b93ad; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="floor" aria-hidden="true"></div>
+<main>
+  <img class="logo" src="/logo.svg" alt="">
+  <h1>K9X Sentinel</h1>
+  <div class="tag">Threat watch for the K9-AIF framework</div>
+
+  <form class="card" id="f" autocomplete="on" novalidate>
+    <h2>SIGN IN TO K9X SENTINEL</h2>
+    <div class="rule"></div>
+
+    <label for="u">Email / Username</label>
+    <div class="field">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      <input id="u" name="username" autocomplete="username" placeholder="Enter your email or username" required autofocus>
+    </div>
+
+    <label for="p">Password</label>
+    <div class="field">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor"/></svg>
+      <input id="p" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+      <button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+
+    <button class="go" type="submit" id="go">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Sign in</span>
+    </button>
+    <p class="err" id="err" role="alert"></p>
+    <div class="foot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+      Secure access to threat intelligence and K9-AIF monitoring
+    </div>
+  </form>
+  <div class="meta">Private instance · findings describe gaps that may not be fixed yet · <a href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener noreferrer">k9aif/k9x-sentinel</a></div>
+</main>
+
+<script>
+// Sign in
+const f = document.getElementById("f"), err = document.getElementById("err"), go = document.getElementById("go");
+f.addEventListener("submit", async e => {
+  e.preventDefault();
+  err.textContent = "";
+  const username = f.username.value.trim(), password = f.password.value;
+  if (!username || !password) { err.textContent = "Enter your username and password."; return; }
+  go.disabled = true;
+  try {
+    const r = await fetch("/api/login", {method: "POST", credentials: "same-origin",
+      headers: {"Content-Type": "application/json"}, body: JSON.stringify({username, password})});
+    if (r.ok) { location.replace("/" + location.hash); return; }
+    const body = await r.json().catch(() => ({}));
+    err.textContent = body.detail || `Sign-in failed (${r.status}).`;
+    f.password.select();
+  } catch (_) { err.textContent = "Can't reach Sentinel. Is the server running?"; }
+  go.disabled = false;
+});
+const eye = document.getElementById("eye");
+eye.addEventListener("click", () => {
+  const show = f.password.type === "password";
+  f.password.type = show ? "text" : "password";
+  eye.setAttribute("aria-pressed", String(show));
+  eye.setAttribute("aria-label", show ? "Hide password" : "Show password");
+});
+
+// Background: two particle waves, violet on the left, cyan on the right
+(() => {
+  const c = document.getElementById("bg"), x = c.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let w, h, dpr;
+  function size() { dpr = Math.min(devicePixelRatio || 1, 2); w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr; }
+  size(); addEventListener("resize", size);
+  const stars = Array.from({length: 140}, () => [Math.random(), Math.random(), Math.random()]);
+  function wave(t, side) {
+    const left = side < 0, rgb = left ? "168,85,247" : "56,189,248";
+    for (let band = 0; band < 26; band++) {
+      for (let i = 0; i <= 70; i++) {
+        const u = i / 70;
+        const px = left ? u * w * 0.36 : w - u * w * 0.36;
+        const amp = h * (0.05 + band * 0.006);
+        const py = h * (left ? 0.36 : 0.30) + band * h * 0.011 + Math.sin(u * 5.2 + t * 0.6 + band * 0.32) * amp * (1 - u * 0.6) + (left ? u : u * 0.6) * h * 0.22;
+        const a = (1 - u) * (0.08 + 0.6 * Math.max(0, Math.sin(u * 9 + band + t))) * 0.55;
+        x.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
+        x.fillRect(px, py, 1.6 * dpr, 1.6 * dpr);
+      }
+    }
+  }
+  function frame(ms) {
+    const t = ms / 1000;
+    x.clearRect(0, 0, w, h);
+    const g = x.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.max(w, h) * 0.7);
+    g.addColorStop(0, "rgba(40,30,80,.35)"); g.addColorStop(1, "rgba(5,6,12,0)");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    for (const [sx, sy, sz] of stars) {
+      x.fillStyle = `rgba(${sx < .5 ? "190,160,255" : "150,210,255"},${0.15 + 0.35 * Math.abs(Math.sin(t * 0.7 + sz * 9))})`;
+      x.fillRect(sx * w, sy * h, (0.6 + sz) * dpr, (0.6 + sz) * dpr);
+    }
+    wave(t, -1); wave(t, 1);
+    if (!still) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

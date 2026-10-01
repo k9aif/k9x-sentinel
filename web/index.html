@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>K9X Sentinel</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#5d6678; --line:#e1e4ea; --accent:#2f5bd3;
           --gap:#c0392b; --partial:#c27c0e; --covered:#1e8449; --dep:#6c3fb5; }
@@ -35,7 +36,8 @@
   .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; border:1px solid currentColor; }
   .gap { color:var(--gap); } .partial { color:var(--partial); } .covered { color:var(--covered); }
   .dependency { color:var(--dep); } .mute { color:var(--mute); }
-  nav.views { display:flex; gap:6px; }
+  nav.views { display:flex; gap:6px; align-items:center; }
+  a.navlink { color:var(--ink); text-decoration:none; border:1px solid var(--line); padding:6px 12px; border-radius:6px; background:var(--card); }
   nav.views button.on { border-color:var(--accent); color:var(--accent); }
   .arch { padding:8px; background:#fff; }
   .arch img { display:block; width:100%; min-width:900px; height:auto; }
@@ -55,12 +57,14 @@
 </head>
 <body>
 <header>
+  <img src="/logo.svg" alt="" width="30" height="34">
   <h1>K9X Sentinel</h1>
   <span class="sub">threat watch for the K9-AIF framework</span>
-  <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="architecture">Architecture</button></nav>
+  <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="architecture">Architecture</button><a class="navlink" href="/about">About</a></nav>
   <span class="spacer"></span>
   <span id="runstate" class="mute"></span>
   <button id="runbtn" class="primary">Run now</button>
+  <button id="signout">Sign out</button>
 </header>
 <main>
  <section id="view-findings">
@@ -101,6 +105,7 @@ const when = t => t ? new Date(t * 1000).toLocaleDateString() : "—";
 const pill = v => v ? `<span class="pill ${esc(v)}">${esc(v.replace("_", " "))}</span>` : `<span class="mute">—</span>`;
 async function api(path, opts) {
   const r = await fetch(path, {credentials: "same-origin", ...opts});
+  if (r.status === 401) { location.replace("/"); throw new Error("signed out"); }
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
@@ -179,6 +184,10 @@ document.getElementById("runbtn").addEventListener("click", async () => {
   try { await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); }
   catch (err) { document.getElementById("runstate").textContent = err.message; }
   loadStatus();
+});
+document.getElementById("signout").addEventListener("click", async () => {
+  await fetch("/api/logout", {method: "POST", credentials: "same-origin"});
+  location.replace("/");
 });
 window.addEventListener("hashchange", route);
 function route() { const m = location.hash.match(/^#item-(\d+)$/); if (m) showItem(+m[1]); }

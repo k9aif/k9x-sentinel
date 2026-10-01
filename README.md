@@ -45,13 +45,15 @@ Until k9x-hil takes the actor from the authenticated user and checks membership,
 ```bash
 cp .env.example .env              # set OLLAMA_BASE_URL, KAFKA_BROKER, SENTINEL_PASSWORD, ...
 python -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
-./run.sh                          # pre-flight, then http://localhost:8114 (login from .env)
-pytest -q                         # 44 tests, no network or models needed
+./run.sh                          # pre-flight, then http://localhost:8114 (sign in with SENTINEL_USER / SENTINEL_PASSWORD)
+pytest -q                         # 48 tests, no network or models needed
 ```
 
 On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114, LAN only.
 
 Prerequisites: Ollama with the analysis model (`SENTINEL_MODEL`, default `qwen3.8:27b`) and `granite4.1-guardian:8b` (mandatory, fails closed); Kafka/Redpanda and k9x-hil with the *Framework Security Updates* queue (seeded by k9x-hil at start-up) for HIL.
+
+The UI has a sign-in page (signed, HttpOnly session cookie; 5 failed attempts lock an address for 5 minutes), the findings view, an Architecture tab and an About page for architects (`/about`, public: what Sentinel is, how it keeps K9-AIF current, what to do for an organization, setup). Scripts can still use HTTP Basic (`ubuntu/build-run.sh run`).
 
 ## Layout
 
@@ -64,8 +66,9 @@ sentinel/
   sources.py  osv.py             feed readers (SSRF-safe) and the dependency audit
   catalog.py                     loads the framework's capability catalog
   github_actions.py              draft advisory / issue (dry_run by default)
-  store.py  runner.py  api.py    SQLite, the daily run + scheduler, FastAPI + login
-web/index.html                   UI (plain JS, all model/feed text escaped)
+  store.py  runner.py  api.py    SQLite, the daily run + scheduler, FastAPI
+  auth.py                        sign-in sessions, lockout
+web/                             index.html (app), login.html, about.html, logo.svg, architecture.svg
 ubuntu/                          Containerfile, build-run.sh
 ```
 

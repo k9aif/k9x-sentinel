@@ -2,9 +2,10 @@
 # K9-AIF Framework
 """K9X Sentinel web API and UI (private: findings describe unpatched gaps).
 
-Everything except /api/health needs the single login from .env
-(SENTINEL_USER / SENTINEL_PASSWORD, HTTP Basic). No password set = the UI
-and API are disabled; the scheduler still runs.
+Everything except /api/health, the sign-in page and its assets needs the
+single login from .env (SENTINEL_USER / SENTINEL_PASSWORD): a signed session
+cookie from the sign-in page, or HTTP Basic for scripts (see auth.py). No
+password set = the UI and API are disabled; the scheduler still runs.
 
 On start: the SQLite store, the daily scheduler, and (when KAFKA_BROKER is
 set) the router's HIL reply listener."""
@@ -13,16 +14,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import secrets
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from sentinel import catalog, runner, store
+from sentinel import auth, catalog, runner, store
 from sentinel.router.sentinel_router import get_router
 from sentinel.settings import (REPO_URL, analysis_model, credentials, github, hil_detail, kafka_broker, run_at)
 
@@ -30,18 +30,34 @@ log = logging.getLogger(__name__)
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 app = FastAPI(title="K9X Sentinel", docs_url=None, redoc_url=None, openapi_url=None)
-_basic = HTTPBasic(realm="K9X Sentinel")
+_basic = HTTPBasic(auto_error=False)   # no WWW-Authenticate: never the browser's own popup
 
 
-def login(creds: HTTPBasicCredentials = Depends(_basic)) -> str:
-    want = credentials()
-    if not want["password"]:
+def _client(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def current_user(request: Request, basic: Optional[HTTPBasicCredentials] = Depends(_basic)) -> Optional[str]:
+    if not credentials()["password"]:
         raise HTTPException(503, "Set SENTINEL_PASSWORD in .env to enable the UI")
-    ok = secrets.compare_digest(creds.username.encode(), want["user"].encode()) and \
-        secrets.compare_digest(creds.password.encode(), want["password"].encode())
-    if not ok:
-        raise HTTPException(401, "Invalid login", headers={"WWW-Authenticate": 'Basic realm="K9X Sentinel"'})
-    return creds.username
+    user = auth.verify(request.cookies.get(auth.COOKIE))
+    if user:
+        return user
+    if basic is not None:
+        addr = _client(request)
+        if auth.locked(addr):
+            raise HTTPException(429, "Too many failed sign-ins; try again in a few minutes")
+        if auth.check_password(basic.username, basic.password):
+            auth.record_success(addr)
+            return basic.username
+        auth.record_failure(addr)
+    return None
+
+
+def login(user: Optional[str] = Depends(current_user)) -> str:
+    if not user:
+        raise HTTPException(401, "Sign in required")
+    return user
 
 
 async def _listen_for_replies() -> None:
@@ -112,11 +128,51 @@ def run(body: RunRequest, _: str = Depends(login)):
     return {"status": "started"}
 
 
+class SignIn(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login")
+def sign_in(body: SignIn, request: Request):
+    if not credentials()["password"]:
+        raise HTTPException(503, "Set SENTINEL_PASSWORD in .env to enable the UI")
+    addr = _client(request)
+    wait = auth.locked(addr)
+    if wait:
+        raise HTTPException(429, f"Too many failed sign-ins. Try again in {int(wait) // 60 + 1} min.")
+    if not auth.check_password(body.username.strip(), body.password):
+        auth.record_failure(addr)
+        raise HTTPException(401, "Wrong username or password")
+    auth.record_success(addr)
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(auth.COOKIE, auth.issue(body.username.strip()), max_age=auth.TTL_S, httponly=True,
+                    samesite="strict", secure=request.url.scheme == "https", path="/")
+    return resp
+
+
+@app.post("/api/logout")
+def sign_out():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE, path="/")
+    return resp
+
+
 @app.get("/")
-def index(_: str = Depends(login)):
-    return FileResponse(WEB / "index.html")
+def index(user: Optional[str] = Depends(current_user)):
+    return FileResponse(WEB / ("index.html" if user else "login.html"))
+
+
+@app.get("/about")
+def about():
+    return FileResponse(WEB / "about.html")
+
+
+@app.get("/logo.svg")
+def logo():
+    return FileResponse(WEB / "logo.svg", media_type="image/svg+xml")
 
 
 @app.get("/architecture.svg")
-def architecture(_: str = Depends(login)):
+def architecture():
     return FileResponse(WEB / "architecture.svg", media_type="image/svg+xml")

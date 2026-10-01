@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About K9X Sentinel</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; --bg:#07080f; --panel:#10121d; --line:#242840; --ink:#e7e9f3; --mute:#9aa1b8;
+          --violet:#a855f7; --cyan:#38bdf8; --ok:#5fd38d; --warn:#f0b44c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: #93c5fd; }
+  header.hero { padding: 48px 16px 40px; text-align: center; border-bottom: 1px solid var(--line);
+                background: radial-gradient(ellipse at 50% 0%, rgba(124,92,255,.22), transparent 65%),
+                            radial-gradient(ellipse at 100% 100%, rgba(56,189,248,.10), transparent 55%); }
+  header.hero img { width: 72px; filter: drop-shadow(0 0 14px rgba(168,85,247,.5)); }
+  header.hero h1 { margin: 8px 0 4px; font: 800 clamp(32px, 6vw, 56px)/1.1 Orbitron, system-ui, sans-serif;
+                   background: linear-gradient(90deg, #9b5cf6, #c4a1ff 45%, #7dd3fc 72%, #38bdf8);
+                   -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header.hero p { margin: 0 auto; max-width: 760px; color: #cfd3e3; font-size: 18px; }
+  nav.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; display: flex; gap: 6px 18px; flex-wrap: wrap;
+            justify-content: center; padding: 10px 16px; background: rgba(7,8,15,.92); border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(8px); font-size: 14px; }
+  nav.top a { color: var(--mute); text-decoration: none; } nav.top a:hover { color: var(--ink); }
+  main { max-width: 960px; margin: 0 auto; padding: 8px 16px 64px; }
+  section { padding: 34px 0 6px; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+  h2 { margin: 0 0 6px; font-size: 24px; }
+  h2 .n { color: var(--violet); font-family: Orbitron, system-ui, sans-serif; font-size: 16px; margin-right: 10px; }
+  h3 { margin: 22px 0 6px; font-size: 17px; }
+  .lead { color: #cfd3e3; font-size: 17px; margin-top: 4px; }
+  .diagram { margin: 18px 0 6px; overflow-x: auto; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+  .diagram img { display: block; min-width: 880px; width: 100%; height: auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 14px 0; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .tile b { display: block; margin-bottom: 4px; }
+  .tile p { margin: 0; color: #c4c9da; font-size: 14.5px; }
+  ol.loop { counter-reset: s; list-style: none; padding: 0; margin: 14px 0; }
+  ol.loop li { counter-increment: s; position: relative; padding: 10px 12px 10px 52px; margin-bottom: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  ol.loop li::before { content: counter(s); position: absolute; left: 14px; top: 10px; width: 26px; height: 26px; border-radius: 50%;
+                       display: grid; place-items: center; font: 700 13px Orbitron, system-ui; color: #fff;
+                       background: linear-gradient(135deg, var(--violet), var(--cyan)); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .tablewrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 10px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--mute); font-weight: 600; background: var(--panel); }
+  tr:last-child td { border-bottom: 0; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; }
+  code { background: #171a2a; padding: 1px 6px; border-radius: 5px; }
+  pre { background: #0c0e18; border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; line-height: 1.5; }
+  .note { border-left: 3px solid var(--warn); background: rgba(240,180,76,.07); padding: 10px 14px; border-radius: 0 8px 8px 0; color: #e9dcc0; font-size: 15px; }
+  .back { display: inline-block; margin: 26px 0 0; }
+  footer { text-align: center; color: #6f7690; font-size: 13px; padding: 24px 16px 40px; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <img src="/logo.svg" alt="">
+  <h1>K9X Sentinel</h1>
+  <p>An AI should not fall for another AI's attack. That is the goal of K9-AIF. Sentinel keeps the framework's defences moving as fast as the attacks: it reads the threat landscape every day, checks each new attack against what the framework already does, and puts the gaps in front of the people who decide.</p>
+</header>
+<nav class="top">
+  <a href="#what">What it is</a><a href="#does">What it does</a><a href="#current">Keeping K9-AIF current</a>
+  <a href="#architect">For architects</a><a href="#setup">Set it up</a><a href="#limits">Limits</a><a href="/">Open Sentinel →</a>
+</nav>
+<main>
+
+<section id="what">
+  <h2><span class="n">01</span>What it is</h2>
+  <p class="lead">Agentic applications are being built fast, and so are the attacks on them. More and more, the attacker is itself an AI: one model writes the injection that a second model is meant to obey, hides it in a page, a document or another agent's reply, and varies it until something gets through. Zscaler ThreatLabz put it plainly in its 2026 report: AI agents will phish other AI agents.</p>
+  <p class="lead">That is the problem K9-AIF exists to solve: <b>an AI should not fall for another AI's attack.</b> The framework answers it with layers that don't depend on the model behaving well: deterministic Shield checks, Granite Guardian as a semantic second opinion, signed identity and Zero Trust so an agent can't simply claim authority, screening of tool results so retrieved content is treated as untrusted, and a human in the loop for decisions that matter.</p>
+  <p class="lead">But attacks that are generated, not hand-written, change faster than any release cycle. A control written last quarter can be paraphrased around this week. Sentinel is the part of the K9X ecosystem that keeps up: every new technique is checked against what the framework does today, so its defences are maintained, not frozen at their last release.</p>
+  <div class="grid">
+    <div class="tile"><b>A K9-AIF solution itself</b><p>Router → Orchestrators → Squads → Agents, governed by k9x Shield and Granite Guardian, with human review through the framework's own HIL path. It uses what it protects.</p></div>
+    <div class="tile"><b>Advisory, never autonomous</b><p>Sentinel finds and explains. A person decides. Sentinel never changes code; an approval becomes a draft advisory or an issue for the maintainers.</p></div>
+    <div class="tile"><b>Private by design</b><p>A gap is an unpatched weakness in a public framework. Findings stay behind a login, cases carry only a reference, and gaps go to <i>draft</i> advisories.</p></div>
+  </div>
+</section>
+
+<section id="does">
+  <h2><span class="n">02</span>What it does</h2>
+  <p>Every morning at 06:00:</p>
+  <div class="diagram"><img src="/architecture.svg" alt="K9X Sentinel architecture as horizontal lanes: sources, the Sentinel pipeline, the K9-AIF framework, people and GitHub"></div>
+  <div class="tablewrap"><table>
+    <tr><th>Track</th><th>Reads</th><th>Decides</th></tr>
+    <tr><td><b>Techniques</b></td><td>Zscaler ThreatLabz, OWASP GenAI, OWASP LLM Top 10 and MITRE ATLAS releases, CISA KEV (AI and stack keywords), agent-security researchers (Simon Willison, Embrace The Red)</td><td>A local model compares the article with the framework's capability catalog: <b>covered</b>, <b>partial</b>, <b>gap</b> or <b>not relevant</b>, with OWASP ids, the controls that apply, severity, confidence, rationale and a suggested fix.</td></tr>
+    <tr><td><b>Dependencies</b></td><td>OSV, for every package k9-aif declares</td><td>No model. Is the lowest version k9-aif <i>allows</i> affected by an advisory that has a fix? Then "raise the floor to X".</td></tr>
+  </table></div>
+  <p>Only relevant gaps and partial gaps of at least medium severity reach a person. Everything else is recorded and visible in Sentinel.</p>
+</section>
+
+<section id="current">
+  <h2><span class="n">03</span>How it keeps K9-AIF current</h2>
+  <p class="lead">The key is the <b>capability catalog</b>, <code>k9_security/capabilities.yaml</code>, which ships inside k9-aif. It lists every control (25 today) mapped to OWASP Top 10 for LLM Applications 2025 and OWASP Top 10 for Agentic Applications 2026, with its limits, plus the gaps the maintainers already know about. The catalog closes the loop:</p>
+  <ol class="loop">
+    <li>A new technique is published. Sentinel judges it against the catalog of the k9-aif version you run, and finds a gap or partial gap.</li>
+    <li>A reviewer approves it in k9x-hil. Sentinel opens a private draft security advisory, or an issue for a dependency floor.</li>
+    <li>The maintainers close it: a new Shield check, a new Guardian risk, a safer default, a raised dependency floor.</li>
+    <li>The same commit updates <code>capabilities.yaml</code>. A framework test fails if a control is added without being listed, so the catalog can't drift from the code.</li>
+    <li>From the next release on, Sentinel judges the same kind of threat against the new catalog, and it comes back <b>covered</b>. A threat the maintainers already track is linked to its known gap rather than raised again.</li>
+  </ol>
+  <p>The result is a framework whose answer to "are you protected against X?" is written down, mapped to a public standard, checked against the code by a test, and challenged every day by the outside world.</p>
+</section>
+
+<section id="architect">
+  <h2><span class="n">04</span>What an architect should do for an organization</h2>
+  <p class="lead">Sentinel is a tool. The practice around it is the architect's. In TOGAF terms, this is Phase H, Architecture Change Management, driven by the threat landscape: Sentinel is the change trigger, the Architecture Board is the reviewer, and the catalog is the governed record of what the architecture defends against.</p>
+
+  <h3>1. Know the difference between "the framework can" and "we do"</h3>
+  <p>Most K9-AIF controls are <b>opt-in</b>: the catalog marks each one <code>enabled_by_default</code>. A threat Sentinel calls <i>covered</i> is covered by a control the framework <i>offers</i>. For each of your solutions, keep a short profile of which controls are actually switched on: which Shield checks are on the ingress and egress lists, whether Guardian runs, whether signed identity and Zero Trust are enabled. Review it whenever Sentinel reports a "covered" threat that matters to you. A covered threat in a solution that left the control off is still an open door.</p>
+
+  <h3>2. Decide who reviews, and how fast</h3>
+  <p>Name the approvers (<code>SENTINEL_HIL_APPROVERS</code>), usually the security architect plus one framework maintainer. Cases expire after 14 days unless decided. Treat an expiry as a governance failure, not a "no".</p>
+
+  <h3>3. Set the triage policy to your risk appetite</h3>
+  <p><code>config.yaml → sentinel.triage</code>: minimum severity, minimum confidence, and whether instances of known gaps are raised again. Regulated or federal programmes should usually lower the severity floor to <i>low</i> and accept more review work.</p>
+
+  <h3>4. Add your own sources</h3>
+  <p>Any RSS or Atom feed is one entry in <code>config.yaml</code>: your SOC's advisories, your cloud and model vendors' security bulletins, your sector ISAC. Sentinel treats every one as untrusted input.</p>
+
+  <h3>5. Audit the "covered" and "not relevant" calls</h3>
+  <p>The model can be wrong in the comfortable direction. Once a month, read a sample of items Sentinel did <i>not</i> raise. If you find a miss, tighten the triage policy or add the missing limit to the catalog.</p>
+
+  <h3>6. Keep the findings private, and the disclosure path deliberate</h3>
+  <p>Run Sentinel on the LAN only. Approved gaps go to <b>draft</b> security advisories, and are published only when the fix ships, ideally with a CVE. Internal solutions built on K9-AIF should learn about a fix through your change process before the advisory is public.</p>
+</section>
+
+<section id="setup">
+  <h2><span class="n">05</span>Set it up</h2>
+  <h3>Prerequisites</h3>
+  <ul>
+    <li><b>Ollama</b> with an analysis model (default <code>qwen3.8:27b</code>) and <b>Granite Guardian</b> (<code>granite4.1-guardian:8b</code>, mandatory; Sentinel refuses to run without it).</li>
+    <li><b>Kafka or Redpanda</b> plus <b>k9x-hil</b>, for human review. k9x-hil creates the <i>Framework Security Updates</i> queue at start-up. Without Kafka, findings stay in Sentinel's own UI.</li>
+    <li>Optional: a fine-grained <b>GitHub token</b> for the framework repository (repository security advisories: write, issues: write). Without it, approvals are recorded as dry runs showing the exact request.</li>
+  </ul>
+  <h3>Install</h3>
+<pre>git clone https://github.com/k9aif/k9x-sentinel.git &amp;&amp; cd k9x-sentinel
+cp .env.example .env        # Ollama host, Kafka broker, SENTINEL_PASSWORD, approvers
+python3.11 -m venv .venv &amp;&amp; .venv/bin/pip install -r requirements-dev.txt
+./run.sh                    # pre-flight, then http://localhost:8114</pre>
+  <h3>Run it as a container</h3>
+<pre>ubuntu/build-run.sh all     # build + start on port 8114 (LAN only)
+ubuntu/build-run.sh logs    # pre-flight results
+ubuntu/build-run.sh run     # run now instead of waiting for 06:00</pre>
+  <h3>First week</h3>
+  <ol>
+    <li>Do the first run with <code>KAFKA_BROKER</code> empty. Read every finding in the UI and calibrate the triage policy before anything reaches reviewers.</li>
+    <li>Turn on HIL, name the approvers, and keep <code>SENTINEL_GITHUB_MODE=dry_run</code> until the approvals look right.</li>
+    <li>Then add the GitHub token and switch to <code>live</code>.</li>
+  </ol>
+</section>
+
+<section id="limits">
+  <h2><span class="n">06</span>Limits, stated plainly</h2>
+  <ul>
+    <li>It judges the <b>framework's</b> capabilities, not your deployment's configuration (see section 04.1).</li>
+    <li>Verdicts come from a model. They are evidence for a reviewer, not a decision. Every raised finding is reviewed by a person.</li>
+    <li>It reads public feeds in English. Content behind registration walls, such as full vendor reports, still has to be read by a person.</li>
+    <li>Human review is only as strong as the review system. k9x-hil must take the decision's author from the login and restrict tasks to their application before Sentinel's approver list can be fully trusted.</li>
+  </ul>
+  <a class="back" href="/">← Open Sentinel</a>
+</section>
+</main>
+<footer>K9X Sentinel · part of the K9X ecosystem built on K9-AIF · Apache-2.0 · <a href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener noreferrer">github.com/k9aif/k9x-sentinel</a></footer>
+</body>
+</html>
