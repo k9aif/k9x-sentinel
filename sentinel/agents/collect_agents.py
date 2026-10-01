@@ -34,6 +34,8 @@ class FeedCollectorAgent(SentinelAgent):
         for src in configured_sources(self.config):
             if src["kind"] == "osv" or (only and src["id"] not in only):
                 continue
+            if activity.stop_requested():
+                break
             first_time = store.source_first_run(src["id"]) is None
             name = src.get("name", src["id"])
             activity.emit("sources", f"Connecting to {name} …", source=src["id"])
@@ -68,6 +70,8 @@ class DependencyAuditAgent(SentinelAgent):
         for src in configured_sources(self.config):
             if src["kind"] != "osv" or (only and src["id"] not in only):
                 continue
+            if activity.stop_requested():
+                break
             activity.emit("sources", "Connecting to OSV: checking every dependency k9-aif declares …", source=src["id"])
             try:
                 findings = osv.audit(src, timeout, on_package=lambda name, hit: activity.emit(

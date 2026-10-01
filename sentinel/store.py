@@ -306,6 +306,17 @@ def items_for_dedup(statuses: Iterable[str], since: float) -> List[Dict[str, Any
         return [_row(r) for r in con.execute(q)]
 
 
+def requeue_baseline(days: float, now: Optional[float] = None) -> int:
+    """Baseline items published within ``days`` become new (assessed next run)."""
+    t = _t("items")
+    since = (now or time.time()) - days * 86400
+    with _engine().begin() as con:
+        res = con.execute(update(t).where(t.c.status == "baseline",
+                                          func.coalesce(t.c.published, t.c.first_seen) >= since)
+                          .values(status="new", updated=time.time()))
+        return res.rowcount or 0
+
+
 def ids_with_status(statuses: Iterable[str]) -> List[int]:
     t = _t("items")
     with _engine().connect() as con:
@@ -319,6 +330,8 @@ def list_items(status: Optional[str] = None, verdict: Optional[str] = None, sour
                t.c.status, t.c.verdict, t.c.severity, t.c.correlation_id, t.c.error, t.c.updated)
     if status:
         q = q.where(t.c.status == status)
+    else:   # "All" = everything Sentinel looked at; baseline items have their own tab
+        q = q.where(t.c.status != "baseline")
     if verdict:
         q = q.where(t.c.verdict == verdict)
     if source:

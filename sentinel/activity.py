@@ -33,6 +33,26 @@ def emit(stage: str, msg: str, level: str = "info", source: Optional[str] = None
             _CURRENT.update(stage=stage, source=source, item=item)
 
 
+_STOP = threading.Event()
+
+
+def request_stop() -> None:
+    _STOP.set()
+
+
+def clear_stop() -> None:
+    _STOP.clear()
+
+
+def stop_requested() -> bool:
+    return _STOP.is_set()
+
+
+def wait(seconds: float) -> bool:
+    """Sleep, waking early when a stop is requested. True = stop requested."""
+    return _STOP.wait(seconds)
+
+
 def reset_current() -> None:
     with _LOCK:
         _CURRENT.update(stage=None, source=None, item=None)

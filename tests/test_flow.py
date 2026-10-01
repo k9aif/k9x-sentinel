@@ -259,7 +259,7 @@ def test_backend_outage_pauses_retries_then_stops_without_burning_attempts(shiel
         raise RuntimeError("LLM backend unavailable (agent=GapAnalysisAgent) [WARN] Ollama connection failed")
     monkeypatch.setattr(aa.GapAnalysisAgent, "ask", down)
     slept = []
-    monkeypatch.setattr(runner.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(runner.activity, "wait", lambda s: slept.append(s) or False)
     router = build(FakeBus())
     router.config["sentinel"]["backend_retry_pauses_s"] = [1, 2]
     router.config["sentinel"]["sources"] = []
@@ -288,10 +288,35 @@ def test_a_slow_answer_after_a_pause_continues_the_run(shield_only, model, monke
             raise RuntimeError("LLM backend unavailable: TimeoutError timed out")
         return real(self, prompt, system_prompt, task_type)
     monkeypatch.setattr(aa.GapAnalysisAgent, "ask", flaky)
-    monkeypatch.setattr(runner.time, "sleep", lambda s: None)
+    monkeypatch.setattr(runner.activity, "wait", lambda s: False)
     router = build(FakeBus())
     router.config["sentinel"]["sources"] = []
     monkeypatch.setattr(runner, "get_router", lambda: router)
     item = article()
     out = runner.run_once()
     assert out["status"] == "completed" and store.get_item(item)["status"] == "pending_hil"
+
+
+
+def test_admin_stop_ends_the_run_after_the_current_item(shield_only, model, monkeypatch):
+    from sentinel import activity, runner
+    router = build(FakeBus())
+    router.config["sentinel"]["sources"] = []
+    monkeypatch.setattr(runner, "get_router", lambda: router)
+    first = article()
+    second = store.add_item({"uid": "t:9", "source": "willison_prompt_injection", "kind": "article",
+                             "title": "Two", "content": "x"})
+    real_route = router.route
+
+    def route_then_stop(payload):
+        out = real_route(payload)
+        if payload.get("event_type") == "sentinel.assess":
+            activity.request_stop()        # admin clicks STOP while item 1 is assessed
+        return out
+    monkeypatch.setattr(router, "route", route_then_stop)
+    out = runner.run_once()
+    assert out["status"] == "stopped" and out["assessed"]["deferred"] == 1
+    assert store.get_item(first)["status"] == "pending_hil"      # finished, kept
+    assert store.get_item(second)["status"] == "new"             # untouched, next run
+    assert store.last_runs(1)[0]["status"] == "stopped"
+    assert not activity.stop_requested()                          # cleaned up for the next run

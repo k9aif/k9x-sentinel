@@ -137,7 +137,8 @@ def status(user: str = Depends(login)):
         cat_info = {"error": str(exc)[:300]}
     gh = github()
     return {"state": runner.STATE, "counts": store.counts(), "runs": store.last_runs(10), "catalog": cat_info,
-            "settings": {"model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
+            "settings": {"provider": "Ollama", "guardian_model": get_router().config["governance"]["guardian"]["model"],
+                         "model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
                          "hil_detail": hil_detail(), "github_mode": gh["mode"], "github_repo": gh["repo"],
                          "github_token": bool(gh["token"])},
             "database": {**store.backend(), "where": "hidden"} if viewer(user) else store.backend(),
@@ -230,6 +231,28 @@ def audit_csv(request: Request, user: str = Depends(admin)):
             buf.truncate()
     return StreamingResponse(rows(), media_type="text/csv",
                              headers={"Content-Disposition": 'attachment; filename="k9x-sentinel-audit.csv"'})
+
+
+@app.post("/api/run/stop")
+def stop_run(request: Request, user: str = Depends(admin)):
+    if not runner.STATE["running"]:
+        raise HTTPException(409, "no run in progress")
+    activity.request_stop()
+    store.audit("run_stop_requested", actor=user, address=_client(request))
+    activity.emit("run", f"Stop requested by {user}: the current item finishes, then the run stops", "warn")
+    return {"status": "stopping"}
+
+
+class Requeue(BaseModel):
+    days: int = 90
+
+
+@app.post("/api/baseline/requeue")
+def requeue(body: Requeue, request: Request, user: str = Depends(admin)):
+    days = max(1, min(int(body.days), 730))
+    n = store.requeue_baseline(days)
+    store.audit("baseline_requeued", actor=user, address=_client(request), days=days, items=n)
+    return {"requeued": n, "days": days}
 
 
 class RunRequest(BaseModel):

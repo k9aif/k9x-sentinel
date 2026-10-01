@@ -21,6 +21,11 @@
   button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); padding:6px 12px; border-radius:6px; cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button:disabled { opacity:.5; cursor:default; }
+  button.danger { background:var(--gap); border-color:var(--gap); color:#fff; }
+  #models { font-size:12.5px; }
+  .requeue { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 10px; }
+  .requeue input { width:70px; font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px;
+                   background:var(--card); color:var(--ink); }
   main { padding:16px 24px 48px; max-width:1300px; margin:0 auto; }
   .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
@@ -114,6 +119,7 @@
 <header>
   <img src="/logo.svg" alt="" width="30" height="34">
   <h1>K9X Sentinel</h1>
+  <span class="mute" id="models" title="Provider · analysis model · screening model"></span>
   <span class="sub">threat watch for the K9-AIF framework</span>
   <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="hil">HIL History</button><button data-view="architecture">Architecture</button><a class="navlink" href="/about">About</a></nav>
   <span class="spacer"></span>
@@ -132,6 +138,11 @@
   </div>
   <div class="cards" id="cards"></div>
   <div class="tabs" id="tabs"></div>
+  <div class="requeue" id="requeue" hidden>
+    <span class="mute">Baseline items were older than the look-back window when their source was first read, so they were recorded but never assessed.</span>
+    <span>Assess those from the last</span><input id="requeuedays" type="number" min="1" max="730" value="120"><span>days</span>
+    <button id="requeuebtn">Queue for the next run</button><span class="mute" id="requeuemsg"></span>
+  </div>
   <div class="wrap"><table>
     <thead><tr><th>#</th><th>Finding</th><th>Source</th><th>Verdict</th><th>Severity</th><th>Status</th><th>Published</th></tr></thead>
     <tbody id="rows"></tbody>
@@ -173,7 +184,8 @@
 const TABS = [
   ["Needs review", {status: "pending_hil"}], ["Gaps", {verdict: "gap"}], ["Partial", {verdict: "partial"}],
   ["Covered", {verdict: "covered"}], ["Not relevant", {verdict: "not_relevant"}], ["Decided", {status: "decided"}],
-  ["Duplicates", {status: "duplicate"}], ["Errors", {status: "error"}], ["Failed", {status: "failed"}], ["Unsent (no Kafka)", {status: "hil_failed"}], ["All", {}],
+  ["Duplicates", {status: "duplicate"}], ["Errors", {status: "error"}], ["Failed", {status: "failed"}],
+  ["Baseline (not assessed)", {status: "baseline"}], ["Unsent (no Kafka)", {status: "hil_failed"}], ["All", {}],
 ];
 let tab = 0;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -202,7 +214,16 @@ async function loadStatus() {
     card("Pipeline", `${esc(s.settings.model)} · HIL ${s.settings.hil ? esc(s.settings.hil_detail) : "off"} · GitHub ${esc(s.settings.github_mode)}`) +
     card("Database", `${esc(s.database.dialect === "postgresql" ? "PostgreSQL" : "SQLite (local file)")}${s.database.schema ? " · " + esc(s.database.schema) : ""}<div class="note">${esc(s.database.where)}</div>`);
   document.getElementById("runstate").textContent = s.state.running ? `running: ${s.state.phase}${s.state.item ? " · item " + s.state.item : ""}` : "";
-  if (document.getElementById("runbtn")) document.getElementById("runbtn").disabled = s.state.running;
+  const rb = document.getElementById("runbtn");
+  if (rb) {
+    const stopping = s.state.running && rb.dataset.stopping === "1";
+    rb.textContent = !s.state.running ? "Run now" : stopping ? "Stopping…" : "STOP";
+    rb.classList.toggle("danger", s.state.running);
+    rb.disabled = stopping;
+    if (!s.state.running) rb.dataset.stopping = "";
+  }
+  document.getElementById("models").textContent =
+    `${s.settings.provider} · ${s.settings.model} · Guardian ${s.settings.guardian_model}`;
   if (s.state.running && document.getElementById("live").hidden && !liveTimer) { showLive(true); pollLive(); }
 }
 
@@ -211,7 +232,17 @@ function drawTabs() {
     `<button class="${i === tab ? "on" : ""}" data-i="${i}">${esc(t[0])}</button>`).join("");
 }
 
+document.getElementById("requeuebtn").addEventListener("click", async () => {
+  const days = +document.getElementById("requeuedays").value || 120;
+  try {
+    const r = await api("/api/baseline/requeue", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                  body: JSON.stringify({days})});
+    document.getElementById("requeuemsg").textContent = `${r.requeued} item(s) queued: click Run now (the pre-filter and duplicate check apply).`;
+    loadItems(); loadStatus();
+  } catch (err) { document.getElementById("requeuemsg").textContent = err.message; }
+});
 async function loadItems() {
+  document.getElementById("requeue").hidden = !(ROLE === "admin" && TABS[tab][1].status === "baseline");
   const q = new URLSearchParams({...TABS[tab][1], ...(srcFilter ? {source: srcFilter} : {})}).toString();
   const rows = await api("/api/items" + (q ? "?" + q : ""));
   document.getElementById("rows").innerHTML = rows.length ? rows.map(r => `
@@ -266,6 +297,14 @@ document.getElementById("rows").addEventListener("click", e => {
   const tr = e.target.closest("tr.row"); if (tr) location.hash = "item-" + tr.dataset.id;
 });
 document.getElementById("runbtn").addEventListener("click", async () => {
+  const rb = document.getElementById("runbtn");
+  if (rb.textContent === "STOP") {
+    if (!window.confirm("Stop the job in progress?\n\nThe item being assessed finishes, then the run stops. Items not yet assessed wait for the next run.")) return;
+    rb.dataset.stopping = "1"; rb.textContent = "Stopping…"; rb.disabled = true;
+    try { await api("/api/run/stop", {method: "POST"}); } catch (err) { document.getElementById("runstate").textContent = err.message; }
+    return;
+  }
+  rb.dataset.stopping = "";
   try {
     await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
     document.getElementById("console").innerHTML = ""; chipState = {}; srcCount = {}; itemSource = {};

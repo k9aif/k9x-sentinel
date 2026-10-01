@@ -31,6 +31,7 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
         return {"status": "busy"}
     run_id = store.start_run()
     STATE.update(running=True, phase="collecting", item=None)
+    activity.clear_stop()
     stats: Dict[str, Any] = {}
     activity.emit("run", f"Run #{run_id} started")
     try:
@@ -42,7 +43,14 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
         activity.emit("run", f"{len(queue)} item(s) to assess")
         pauses = [float(p) for p in router.config.get("sentinel", {}).get("backend_retry_pauses_s", [60, 120, 300])]
         stopped = False
+        stopped_by = None
         for n, item_id in enumerate(queue, 1):
+            if activity.stop_requested():
+                stopped_by = "admin"
+                outcomes["deferred"] += len(queue) - n + 1
+                activity.emit("run", f"Stopped by the administrator: {len(queue) - n + 1} item(s) wait for the next run",
+                              "warn")
+                break
             STATE["item"] = item_id
             STATE["phase"] = f"assessing {n} of {len(queue)}"
             result = router.route({"event_type": "sentinel.assess", "item_id": item_id})
@@ -51,9 +59,15 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
                     break
                 STATE["phase"] = f"model backend unavailable: retrying item {item_id} in {int(wait)} s"
                 activity.emit("run", f"Model backend unavailable: pausing {int(wait)} s, then retrying #{item_id}", "warn")
-                time.sleep(wait)
+                if activity.wait(wait):
+                    break
                 STATE["phase"] = f"assessing {n} of {len(queue)} (retry)"
                 result = router.route({"event_type": "sentinel.assess", "item_id": item_id})
+            if result.get("status") == "backend_unavailable" and activity.stop_requested():
+                stopped_by = "admin"
+                outcomes["deferred"] += len(queue) - n + 1
+                activity.emit("run", "Stopped by the administrator during a pause", "warn")
+                break
             if result.get("status") == "backend_unavailable":
                 left = len(queue) - n + 1
                 activity.emit("run", f"Model backend still unavailable: stopping; {left} item(s) wait for the next run",
@@ -63,6 +77,10 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
                 break
             outcomes[result.get("status", "unknown")] += 1
         stats["assessed"] = dict(outcomes)
+        if stopped_by or (activity.stop_requested() and not stats["assessed"]):
+            store.finish_run(run_id, "stopped", {**stats, "reason": "stopped by the administrator"})
+            activity.emit("run", f"Run #{run_id} stopped", "warn")
+            return {"status": "stopped", "run_id": run_id, **stats}
         if stopped:
             store.finish_run(run_id, "stopped", {**stats, "reason": "model backend unavailable"})
             return {"status": "stopped", "run_id": run_id, **stats}
@@ -78,6 +96,7 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
     finally:
         STATE.update(running=False, phase="", item=None)
         activity.reset_current()
+        activity.clear_stop()
         _RUN_LOCK.release()
 
 
