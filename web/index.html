@@ -105,7 +105,7 @@ const when = t => t ? new Date(t * 1000).toLocaleDateString() : "—";
 const pill = v => v ? `<span class="pill ${esc(v)}">${esc(v.replace("_", " "))}</span>` : `<span class="mute">—</span>`;
 async function api(path, opts) {
   const r = await fetch(path, {credentials: "same-origin", ...opts});
-  if (r.status === 401) { location.replace("/"); throw new Error("signed out"); }
+  if (r.status === 401) { location.replace("/login"); throw new Error("signed out"); }
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
@@ -187,7 +187,7 @@ document.getElementById("runbtn").addEventListener("click", async () => {
 });
 document.getElementById("signout").addEventListener("click", async () => {
   await fetch("/api/logout", {method: "POST", credentials: "same-origin"});
-  location.replace("/");
+  location.replace("/login");
 });
 window.addEventListener("hashchange", route);
 function route() { const m = location.hash.match(/^#item-(\d+)$/); if (m) showItem(+m[1]); }

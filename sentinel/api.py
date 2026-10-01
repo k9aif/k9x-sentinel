@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
@@ -152,7 +152,7 @@ def sign_in(body: SignIn, request: Request):
     auth.record_success(addr)
     resp = JSONResponse({"ok": True})
     resp.set_cookie(auth.COOKIE, auth.issue(body.username.strip()), max_age=auth.TTL_S, httponly=True,
-                    samesite="strict", secure=request.url.scheme == "https", path="/")
+                    samesite="lax", secure=request.url.scheme == "https", path="/")
     return resp
 
 
@@ -163,9 +163,25 @@ def sign_out():
     return resp
 
 
+# The app and the sign-in page live at different URLs and are never cached.
+# (One URL serving either page let the browser show a cached copy of the wrong
+# one: the sign-in page after signing in, and after Sign out the app, whose 401s
+# sent it back to "/" in an endless loop.)
+NO_STORE = {"Cache-Control": "no-store", "Vary": "Cookie"}
+
+
 @app.get("/")
 def index(user: Optional[str] = Depends(current_user)):
-    return FileResponse(WEB / ("index.html" if user else "login.html"))
+    if not user:
+        return RedirectResponse("/login", status_code=303, headers=NO_STORE)
+    return FileResponse(WEB / "index.html", headers=NO_STORE)
+
+
+@app.get("/login")
+def login_page(user: Optional[str] = Depends(current_user)):
+    if user:
+        return RedirectResponse("/", status_code=303, headers=NO_STORE)
+    return FileResponse(WEB / "login.html", headers=NO_STORE)
 
 
 @app.get("/about")

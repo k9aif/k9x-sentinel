@@ -40,8 +40,11 @@ def test_no_password_disables_the_ui(client, monkeypatch):
 
 def test_public_pages_reveal_no_findings(client, monkeypatch):
     monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
-    page = client.get("/")
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+    page = client.get("/login")
     assert page.status_code == 200 and "SIGN IN TO K9X SENTINEL" in page.text and "/api/items" not in page.text
+    assert page.headers["cache-control"] == "no-store"
     about = client.get("/about")
     assert about.status_code == 200 and "another AI" in about.text
     for path in ("/logo.svg", "/architecture.svg"):
@@ -55,8 +58,11 @@ def test_sign_in_sets_a_session_that_opens_the_app(client, monkeypatch):
     r = client.post("/api/login", json={"username": "admin", "password": "s3cret"})
     assert r.status_code == 200
     cookie = r.headers["set-cookie"].lower()
-    assert "httponly" in cookie and "samesite=strict" in cookie
-    assert 'data-view="architecture"' in client.get("/").text        # the app, not the sign-in page
+    assert "httponly" in cookie and "samesite=lax" in cookie
+    app_page = client.get("/")
+    assert 'data-view="architecture"' in app_page.text                  # the app, not the sign-in page
+    assert app_page.headers["cache-control"] == "no-store"
+    assert client.get("/login", follow_redirects=False).headers["location"] == "/"
     assert client.get("/api/items").status_code == 200
     client.post("/api/logout")
     assert client.get("/api/items").status_code == 401

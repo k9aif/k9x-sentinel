@@ -2,7 +2,7 @@
 # K9-AIF Framework
 """Sign-in for the Sentinel UI: one account from .env, a signed session cookie.
 
-    session cookie  "<user>|<expiry>|<HMAC-SHA256>"  HttpOnly, SameSite=Strict, 12 h
+    session cookie  "<user>|<expiry>|<HMAC-SHA256>"  HttpOnly, SameSite=Lax, 12 h
                     signed with SENTINEL_SESSION_SECRET, or a random per-process
                     secret (sessions then end when the server restarts)
     HTTP Basic      scripts only, with an X-Sentinel-Client header (build-run.sh run,
