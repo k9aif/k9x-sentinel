@@ -205,15 +205,21 @@ def hil_history(overdue_days: float = 7.0, now: Optional[float] = None) -> List[
     with _engine().connect() as con:
         rows = [_row(r) for r in con.execute(
             select(ev).where(ev.c.event.in_(HIL_EVENTS), ev.c.item_id.is_not(None)).order_by(ev.c.id))]
-        ids = sorted({r["item_id"] for r in rows})
+        # Findings that went to review before the audit trail existed (or whose
+        # events are missing) still count: a HIL case id or a review status.
+        legacy = [r[0] for r in con.execute(select(it.c.id).where(
+            (it.c.correlation_id.is_not(None)) | (it.c.status.in_(("pending_hil", "hil_failed", "decided")))))]
+        ids = sorted({r["item_id"] for r in rows} | set(legacy))
         items = {r._mapping["id"]: _row(r) for r in con.execute(
             select(it.c.id, it.c.title, it.c.kind, it.c.source, it.c.link, it.c.published, it.c.verdict,
                    it.c.severity, it.c.status, it.c.correlation_id).where(it.c.id.in_(ids)))} if ids else {}
     out: Dict[int, Dict[str, Any]] = {}
+    blank = {"raised_at": None, "times_raised": 0, "unsent": 0, "outcome": None, "decided_by": None,
+             "decided_at": None, "comment": None, "ignored": [], "github": None}
+    for i in ids:
+        out[i] = {**items.get(i, {"id": i}), **blank, "ignored": []}
     for r in rows:
-        h = out.setdefault(r["item_id"], {**items.get(r["item_id"], {"id": r["item_id"]}), "raised_at": None,
-                                          "times_raised": 0, "unsent": 0, "outcome": None, "decided_by": None,
-                                          "decided_at": None, "comment": None, "ignored": [], "github": None})
+        h = out[r["item_id"]]
         d = r["detail"] or {}
         if r["event"] == "raised_to_hil":
             h["times_raised"] += 1
@@ -229,6 +235,9 @@ def hil_history(overdue_days: float = 7.0, now: Optional[float] = None) -> List[
         elif r["event"] == "github_action":
             h["github"] = {k: d.get(k) for k in ("mode", "kind", "ok", "url", "error")}
     for h in out.values():
+        if not h["times_raised"] and h.get("correlation_id"):
+            h["times_raised"] = 1           # raised before the audit trail: time unknown
+            h["legacy"] = True
         start = h.get("last_raised_at") or h.get("raised_at")
         waiting = h["outcome"] is None and h.get("status") == "pending_hil" and start
         h["waiting_days"] = round((now - start) / 86400, 1) if waiting else None

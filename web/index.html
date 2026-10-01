@@ -299,7 +299,7 @@ async function loadHil() {
   const n = k => cases.filter(k).length;
   document.getElementById("hilcards").innerHTML =
     card("Sent for review", cases.length) +
-    card("Waiting", n(c => c.waiting_days != null)) +
+    card("Waiting", n(c => c.status === "pending_hil")) +
     card(`Overdue (> ${overdue_days} days)`, `<span class="${n(c => c.overdue) ? "gap" : ""}">${n(c => c.overdue)}</span>`) +
     card("Approved · rejected · expired", `${n(c => c.outcome === "approved")} · ${n(c => c.outcome === "rejected")} · ${n(c => c.outcome === "expired")}`) +
     card("Ignored decisions", n(c => c.ignored && c.ignored.length));
@@ -307,8 +307,8 @@ async function loadHil() {
     <tr class="row ${c.overdue ? "overdue" : ""}" data-id="${c.id}">
       <td>${c.id}</td><td>${esc(c.title || "")}${c.times_raised > 1 ? ` <span class="mute">(raised ${c.times_raised}×)</span>` : ""}</td>
       <td>${pill(c.kind === "dependency" ? "dependency" : c.verdict)}</td><td>${esc(c.severity || "—")}</td>
-      <td class="mute">${fmt(c.raised_at)}</td>
-      <td>${c.waiting_days != null ? `<span class="${c.overdue ? "gap" : ""}">${c.waiting_days} d${c.overdue ? " · overdue" : ""}</span>` : c.unsent && !c.raised_at ? '<span class="partial">not sent</span>' : "—"}</td>
+      <td class="mute">${c.legacy ? "before audit trail" : fmt(c.raised_at)}</td>
+      <td>${c.waiting_days != null ? `<span class="${c.overdue ? "gap" : ""}">${c.waiting_days} d${c.overdue ? " · overdue" : ""}</span>` : c.legacy && c.status === "pending_hil" ? "waiting" : (c.unsent || c.status === "hil_failed") && !c.raised_at ? '<span class="partial">not sent</span>' : "—"}</td>
       <td>${esc(c.outcome || (c.status === "pending_hil" ? "pending" : "—"))}${c.ignored && c.ignored.length ? ` <span class="partial">(${c.ignored.length} ignored)</span>` : ""}</td>
       <td>${esc(c.decided_by || "—")}</td><td>${esc(c.comment || "—")}</td>
       <td>${c.github ? (c.github.url ? `<a href="${esc(c.github.url)}" target="_blank" rel="noopener noreferrer">${esc(c.github.kind)}</a>` : esc(c.github.kind + " · " + c.github.mode)) : "—"}</td>

@@ -71,3 +71,12 @@ def test_full_round_trip_is_in_the_audit_trail(shield_only, model):
     assessed = store.item_audit(out["item_id"])[2]["detail"]
     assert assessed["model"] and assessed["framework_version"] and len(assessed["text_sha256"]) == 64
     assert store.verify_chain()["ok"]
+
+
+
+def test_cases_raised_before_the_audit_trail_still_show():
+    i = store.add_item({"uid": "old:1", "source": "s", "kind": "article", "title": "Old case"})
+    # raised by an older Sentinel: a case id and status, but no raised_to_hil event
+    store.update_item(i, status="pending_hil", correlation_id="old-case", verdict="partial", severity="medium")
+    cases = {c["id"]: c for c in store.hil_history()}
+    assert cases[i]["legacy"] and cases[i]["times_raised"] == 1 and cases[i]["status"] == "pending_hil"
