@@ -26,8 +26,11 @@ become a GitHub draft advisory or issue (dry_run by default).
 - **The catalog is the framework's, not Sentinel's.** New controls are added
   to `capabilities.yaml` in the framework repo (its test enforces it), never
   to a local copy here.
-- **Findings are private.** No public tunnel for the UI; HIL cases minimal by
-  default; gaps go to *draft* advisories. See the README's k9x-hil note: any
+- **Findings are private.** Only the admin role sees an open gap. The demo
+  (viewer) role gets every technique gap/partial redacted by `api.redact_item`
+  and generic live-log messages; any new endpoint returning item data must
+  apply the same redaction for viewers (tests in test_api.py). HIL cases minimal
+  by default; gaps go to *draft* advisories. See the README's k9x-hil note: any
   k9x-hil user can read every task and set any `actor`.
 - **Fetch only public URLs** (`sources.public_url`, checked on every redirect hop).
 - Agents call `self.enforce_governance()` first; orchestrators can't (it's a

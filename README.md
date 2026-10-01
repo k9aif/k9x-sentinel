@@ -29,7 +29,7 @@ Sentinel spends its day reading attacker-written content, so it's built to survi
 - **Screening labels, it doesn't withhold.** Most relevant articles contain live injection examples. Withholding them would blind Sentinel to exactly the threats it exists for. Content is screened with k9x Shield and Granite Guardian, the result is shown on the finding, and the model is told it's analysing (not obeying) flagged text.
 - **Containment instead:** the analysis model has no tools. Its answer must be one JSON object, and every OWASP id, capability id and known-gap id is checked against the catalog (unknown ones are discarded). Every raised finding goes to a human.
 - **Egress is Shield only.** Granite Guardian classifies *harmful content*, and an accurate analysis of a jailbreak technique reads as harmful to it. Verified live: it blocked every relevant assessment. The analysis agent's egress runs `OutputSanitizationCheck` (markup reaching the UI or GitHub) instead.
-- **Private findings:** a gap is an unpatched weakness in a public framework. The UI requires a login, must never be put on a public tunnel, and approved gaps become **private draft** security advisories, not public issues.
+- **Private findings:** a gap is an unpatched weakness in a public framework. Only the admin login sees gap details. The optional demo login sees every gap as "under private review" (see *Hosting publicly*), and approved gaps become **private draft** security advisories, not public issues.
 
 ## Audit trail and storage
 
@@ -78,10 +78,24 @@ Until k9x-hil takes the actor from the authenticated user and checks membership,
 cp .env.example .env              # set OLLAMA_BASE_URL, KAFKA_BROKER, SENTINEL_PASSWORD, ...
 python -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
 ./run.sh                          # pre-flight, then http://localhost:8114 (sign in with SENTINEL_USER / SENTINEL_PASSWORD)
-pytest -q                         # 59 tests, no network or models needed
+pytest -q                         # 65 tests, no network or models needed
 ```
 
-On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114, LAN only.
+On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114.
+
+### Hosting publicly (demo)
+
+Set `SENTINEL_DEMO_PASSWORD` to enable a read-only viewer; the sign-in page shows its credentials. A viewer sees:
+- sources, run stats, the live view, Architecture and About;
+- covered, not-relevant and dependency (public CVE) findings in full;
+- every **gap and partial gap as "Finding under private review"**: verdict, severity and source only, in the findings list, details, HIL History, audit timeline and the live log;
+- no Run now and no audit export (refused by the server).
+
+Before putting it behind a public hostname (for example a Cloudflare tunnel to `localhost:8114`):
+- set a strong `SENTINEL_PASSWORD` (the admin sign-in faces the internet; 5 failures lock an address for 5 minutes);
+- set `SENTINEL_SESSION_SECRET`;
+- set `SENTINEL_PUBLIC_URL` to the public address;
+- keep `SENTINEL_HIL_DETAIL=minimal`.
 
 Prerequisites: Ollama with the analysis model (`SENTINEL_MODEL`, default `qwen3.8:27b`) and `granite4.1-guardian:8b` (mandatory, fails closed); Kafka/Redpanda and k9x-hil with the *Framework Security Updates* queue (seeded by k9x-hil at start-up) for HIL.
 

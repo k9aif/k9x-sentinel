@@ -4,7 +4,8 @@
 #
 # Commands:
 #   build   — build the k9x-sentinel container image
-#   start   — start the container (port 8114, LAN only: do not put it on a public tunnel)
+#   start   — start the container (port 8114). Public only behind the redacted demo
+#             login (see README "Hosting publicly"); strong SENTINEL_PASSWORD then.
 #   stop    — stop the container
 #   logs    — tail logs (pre-flight results appear here first)
 #   run     — trigger a run now (needs SENTINEL_USER/SENTINEL_PASSWORD in .env)
@@ -54,7 +55,7 @@ case "$cmd" in
     HOST_IP=$(hostname -I | awk '{print $1}')
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  K9X Sentinel (private — LAN only)"
+    echo "  K9X Sentinel"
     echo "  Web UI:  http://${HOST_IP}:${PORT}/"
     echo "  Health:  http://${HOST_IP}:${PORT}/api/health"
     echo "  Check the pre-flight: $0 logs"
