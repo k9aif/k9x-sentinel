@@ -37,6 +37,8 @@
   .gap { color:var(--gap); } .partial { color:var(--partial); } .covered { color:var(--covered); }
   .dependency { color:var(--dep); } .mute { color:var(--mute); }
   nav.views { display:flex; gap:6px; align-items:center; }
+  .pill.role { padding:4px 10px; font-size:12.5px; color:var(--mute); border-color:var(--line); }
+  .pill.role.admin { color:var(--accent); border-color:var(--accent); font-weight:600; }
   a.navlink { color:var(--ink); text-decoration:none; border:1px solid var(--line); padding:6px 12px; border-radius:6px; background:var(--card); }
   nav.views button.on { border-color:var(--accent); color:var(--accent); }
   .arch { padding:8px; background:#fff; }
@@ -427,12 +429,15 @@ document.querySelector("nav.views").addEventListener("click", e => {
 
 let ROLE = "admin";
 async function initRole() {
-  try { ROLE = (await api("/api/me")).role; } catch (_) { return; }
+  let me;
+  try { me = await api("/api/me"); ROLE = me.role; } catch (_) { return; }
+  const badge = ROLE === "admin"
+    ? `<span class="pill role admin" title="Signed in as ${esc(me.user)}: full access, Run now, audit export">Administrator</span>`
+    : '<span class="pill role" title="Read-only. Gaps under private review are hidden.">demo · read-only</span>';
+  document.getElementById("signout").insertAdjacentHTML("beforebegin", badge);
   if (ROLE !== "admin") {
     document.getElementById("runbtn").remove();
     document.querySelectorAll('a[href="/api/audit.csv"]').forEach(a => a.remove());
-    document.querySelector("header .spacer").insertAdjacentHTML("afterend",
-      '<span class="pill" title="Read-only. Gaps under private review are hidden.">demo · read-only</span>');
   }
 }
 drawTabs(); initRole(); loadStatus(); loadItems(); route(); initLive();
