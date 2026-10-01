@@ -97,6 +97,20 @@ pytest -q                         # 76 tests, no network or models needed
 
 On the Podman host (PowerAI): `ubuntu/build-run.sh all`, then `ubuntu/build-run.sh logs` for the pre-flight and `ubuntu/build-run.sh run` to trigger a run without waiting for 06:00. Port 8114.
 
+### Command line
+
+`tools/sentinel_cli.py` reads a running Sentinel with the admin login from `.env` (stdlib only):
+
+```bash
+python3 tools/sentinel_cli.py status            # run state, schedule, catalog, counts
+python3 tools/sentinel_cli.py findings          # open gaps / partial gaps (--all, --json)
+python3 tools/sentinel_cli.py item 74           # one finding: assessment + audit trail
+python3 tools/sentinel_cli.py hil               # every case sent for review
+python3 tools/sentinel_cli.py run --wait        # start a run and follow it
+python3 tools/sentinel_cli.py report 1          # save run #1's HTML report
+```
+`SENTINEL_URL` defaults to `https://sentinel.k9x.ai`.
+
 ### Hosting publicly (demo)
 
 Set `SENTINEL_DEMO_PASSWORD` to enable a read-only viewer; the sign-in page shows its credentials. A viewer sees:
