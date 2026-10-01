@@ -65,3 +65,18 @@ def test_requirements_read_from_installed_k9_aif():
     reqs = osv.requirements("k9-aif")
     assert "pyyaml" in reqs and reqs["pyyaml"]["floor"] is not None
     assert "pyjwt" in reqs and "oidc" in reqs["pyjwt"]["extras"]
+
+
+
+def test_duplicate_osv_records_count_once():
+    """GHSA-x and PYSEC-y for the same CVE are one vulnerability, not two."""
+    def rec(vid, aliases, fixed):
+        v = vuln(vid, fixed)
+        v["aliases"] = aliases
+        return v
+    info = {"spec": ">=3.9", "floor": Version("3.9"), "extras": []}
+    vulns = [rec("GHSA-aaaa-bbbb-cccc", ["CVE-2024-0001"], "3.9.2"), rec("PYSEC-2024-1", ["CVE-2024-0001"], "3.9.2"),
+             rec("GHSA-dddd-eeee-ffff", ["CVE-2024-0002"], "3.10.0"), rec("PYSEC-2024-2", ["CVE-2024-0002", "GHSA-dddd-eeee-ffff"], "3.10.0")]
+    item = osv.findings_for("requests", info, [dict(v, affected=[{**v["affected"][0], "package": {"ecosystem": "PyPI", "name": "requests"}}]) for v in vulns], "s")
+    assert "2 known vulnerabilities" in item["title"]
+    assert sorted(a["id"] for a in item["data"]["advisories"]) == ["GHSA-aaaa-bbbb-cccc", "GHSA-dddd-eeee-ffff"]

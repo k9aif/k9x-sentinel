@@ -133,6 +133,7 @@ def findings_for(name: str, info: Dict[str, Any], vulns: List[Dict[str, Any]], s
                 break
     if not hits:
         return None
+    hits = _merge_duplicates(hits)
     target = max(Version(h["fixed"]) for h in hits)
     sev = max((h["severity"] for h in hits), key=_ORDER.index)
     spec = info["spec"] or "(any version)"
@@ -149,6 +150,27 @@ def findings_for(name: str, info: Dict[str, Any], vulns: List[Dict[str, Any]], s
         "data": {"package": name, "spec": info["spec"], "floor": str(base), "recommended": f"{name}>={target}",
                  "extras": info["extras"], "severity": sev, "advisories": hits},
     }
+
+
+def _merge_duplicates(hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """OSV lists one vulnerability under several records (GitHub GHSA, PyPI PYSEC,
+    the CVE). Merge records that share any id, so counts are distinct
+    vulnerabilities, not records (counting records doubled every figure)."""
+    groups: List[Dict[str, Any]] = []
+    for h in hits:
+        ids = {h["id"], *(h.get("aliases") or [])}
+        merged = [g for g in groups if g["_ids"] & ids]
+        for g in merged:
+            groups.remove(g)
+            ids |= g["_ids"]
+        keep = min([h, *merged], key=lambda x: (not str(x["id"]).startswith("GHSA-"), str(x["id"])))
+        sev = max([h["severity"], *[g["severity"] for g in merged]], key=_ORDER.index)
+        fixed = str(max(Version(x["fixed"]) for x in [h, *merged]))
+        groups.append({**keep, "severity": sev, "fixed": fixed,
+                       "aliases": sorted(ids - {keep["id"]}), "_ids": ids})
+    for g in groups:
+        g.pop("_ids", None)
+    return groups
 
 
 def audit(src: Dict[str, Any], timeout: float, on_package=None) -> List[Dict[str, Any]]:
