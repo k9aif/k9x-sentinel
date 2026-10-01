@@ -100,6 +100,25 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
         _RUN_LOCK.release()
 
 
+def schedule() -> Dict[str, Any]:
+    """{enabled, time, source}: set from the admin screen, else SENTINEL_RUN_AT."""
+    try:
+        saved = store.get_setting("schedule")
+    except Exception:
+        saved = None
+    if isinstance(saved, dict) and saved.get("time"):
+        return {"enabled": bool(saved.get("enabled", True)), "time": saved["time"], "source": "admin"}
+    return {"enabled": True, "time": run_at(), "source": ".env"}
+
+
+def valid_hhmm(value: str) -> bool:
+    try:
+        hour, minute = (int(x) for x in str(value).split(":"))
+        return 0 <= hour <= 23 and 0 <= minute <= 59 and len(str(value)) == 5
+    except ValueError:
+        return False
+
+
 def next_run_after(now: datetime, hhmm: str) -> datetime:
     hour, minute = (int(x) for x in hhmm.split(":"))
     nxt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -107,12 +126,21 @@ def next_run_after(now: datetime, hhmm: str) -> datetime:
 
 
 def _loop(stop: threading.Event) -> None:
+    """Re-reads the schedule every 30 s, so a change from the admin screen
+    applies without a restart."""
     while not stop.is_set():
-        nxt = next_run_after(datetime.now(), run_at())
+        sched = schedule()
+        if not sched["enabled"]:
+            STATE["next_run"] = None
+            stop.wait(30)
+            continue
+        nxt = next_run_after(datetime.now(), sched["time"])
         STATE["next_run"] = nxt.isoformat(timespec="minutes")
-        while not stop.is_set() and datetime.now() < nxt:
-            stop.wait(min(60, max(1, (nxt - datetime.now()).total_seconds())))
-        if not stop.is_set():
+        stop.wait(min(30, max(1, (nxt - datetime.now()).total_seconds())))
+        if stop.is_set():
+            break
+        current = schedule()
+        if current == sched and datetime.now() >= nxt and not STATE["running"]:
             run_once()
 
 

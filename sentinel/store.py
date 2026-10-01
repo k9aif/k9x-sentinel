@@ -79,6 +79,10 @@ def _tables(schema: Optional[str]) -> Dict[str, Table]:
             Column("id", Integer, primary_key=True, autoincrement=True),
             Column("started", Float, nullable=False), Column("finished", Float),
             Column("status", String(20), nullable=False), Column("stats", JSON), Column("error", Text)),
+        "settings": Table(
+            "settings", md,
+            Column("key", String(100), primary_key=True), Column("value", JSON),
+            Column("updated", Float), Column("actor", String(200))),
         "audit_events": Table(
             "audit_events", md,
             Column("id", Integer, primary_key=True, autoincrement=True),
@@ -245,6 +249,22 @@ def hil_history(overdue_days: float = 7.0, now: Optional[float] = None) -> List[
         h["waiting_days"] = round((now - start) / 86400, 1) if waiting else None
         h["overdue"] = bool(waiting and h["waiting_days"] >= overdue_days)
     return sorted(out.values(), key=lambda h: -(h.get("last_raised_at") or h.get("raised_at") or 0))
+
+
+# ── settings (changed from the admin screen; .env is the default) ────────────
+def get_setting(key: str) -> Optional[Any]:
+    t = _t("settings")
+    with _engine().connect() as con:
+        return con.execute(select(t.c.value).where(t.c.key == key)).scalar()
+
+
+def set_setting(key: str, value: Any, actor: str) -> None:
+    t = _t("settings")
+    with _engine().begin() as con:
+        if con.execute(select(t.c.key).where(t.c.key == key)).first():
+            con.execute(update(t).where(t.c.key == key).values(value=value, updated=time.time(), actor=actor))
+        else:
+            con.execute(insert(t).values(key=key, value=value, updated=time.time(), actor=actor))
 
 
 # ── sources ──────────────────────────────────────────────────────────────────

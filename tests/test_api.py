@@ -190,3 +190,59 @@ def test_feed_endpoints_are_public_but_infrastructure_is_not(client):
     body = client.get("/api/public").text
     for private in ("11434", "9092", "5432", "POSTGRES", "password\": \"s3cret"):
         assert private not in body
+
+
+
+def test_admin_sets_the_daily_schedule_and_everyone_sees_it(client, demo_on, monkeypatch):
+    from sentinel import runner, store
+    monkeypatch.setenv("SENTINEL_RUN_AT", "06:00")
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    assert client.get("/api/schedule").json()["time"] == "06:00"            # .env default
+    assert client.get("/api/schedule").json()["source"] == ".env"
+    assert client.put("/api/schedule", json={"time": "25:00", "enabled": True}).status_code == 400
+    r = client.put("/api/schedule", json={"time": "07:30", "enabled": True}).json()
+    assert r["time"] == "07:30" and r["source"] == "admin" and r["next_run"].endswith("07:30")
+    assert runner.schedule() == {"enabled": True, "time": "07:30", "source": "admin"}
+    assert client.get("/api/status").json()["schedule"]["time"] == "07:30"
+    assert store.audit_events()[-1]["event"] == "schedule_changed"
+    client.put("/api/schedule", json={"time": "07:30", "enabled": False})
+    assert client.get("/api/schedule").json()["enabled"] is False
+    client.post("/api/logout")
+    client.post("/api/login", json={"username": "demo", "password": "demo"})
+    assert client.get("/api/schedule").json()["time"] == "07:30"            # visible to demo
+    assert client.put("/api/schedule", json={"time": "08:00", "enabled": True}).status_code == 403
+
+
+def test_valid_times():
+    from sentinel.runner import valid_hhmm
+    assert valid_hhmm("06:00") and valid_hhmm("23:59") and valid_hhmm("00:00")
+    assert not valid_hhmm("24:00") and not valid_hhmm("6:00") and not valid_hhmm("aa:bb") and not valid_hhmm("")
+
+
+def test_run_report_html_admin_full_demo_redacted(client, demo_on, monkeypatch):
+    from sentinel import runner, store
+    from tests.test_flow import FakeBus, answer, build
+    from sentinel.agents import assess_agents as aa
+    monkeypatch.setattr(aa.GapAnalysisAgent, "ask", lambda self, p, s, task_type="analysis": answer())
+    from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
+    from sentinel.agents import common
+    monkeypatch.setattr(common, "build_governance", lambda cfg: ShieldGovernance(config=cfg))
+    router = build(FakeBus())
+    router.config["sentinel"]["sources"] = []
+    monkeypatch.setattr(runner, "get_router", lambda: router)
+    store.add_item({"uid": "r:1", "source": "willison_prompt_injection", "kind": "article",
+                    "title": "Secret technique R", "content": "x"})
+    run = runner.run_once()
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    page = client.get(f"/api/runs/{run['run_id']}/report.html")
+    assert page.status_code == 200 and page.headers["content-type"].startswith("text/html")
+    assert f"run #{run['run_id']}" in page.text and "Secret technique R" in page.text
+    assert "Raised for human review" in page.text and "Audit chain" in page.text and "intact" in page.text
+    dl = client.get(f"/api/runs/{run['run_id']}/report.html?download=1")
+    assert "attachment" in dl.headers["content-disposition"]
+    assert client.get("/api/runs/99999/report.html").status_code == 404
+    client.post("/api/logout")
+    client.post("/api/login", json={"username": "demo", "password": "demo"})
+    demo = client.get(f"/api/runs/{run['run_id']}/report.html").text
+    assert "Secret technique R" not in demo and "under private review" in demo
+    assert "Screen MCP tool metadata" not in demo              # the suggested fix stays private too

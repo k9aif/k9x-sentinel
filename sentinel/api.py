@@ -19,11 +19,11 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from sentinel import activity, auth, catalog, runner, store
+from sentinel import activity, auth, catalog, report, runner, store
 from sentinel.router.sentinel_router import get_router
 from sentinel.settings import (REPO_URL, analysis_model, credentials, demo_credentials, github, hil_detail,
                                hil_overdue_days, kafka_broker, run_at)
@@ -136,7 +136,7 @@ def status(user: str = Depends(login)):
     except Exception as exc:
         cat_info = {"error": str(exc)[:300]}
     gh = github()
-    return {"state": runner.STATE, "counts": store.counts(), "runs": store.last_runs(10), "catalog": cat_info,
+    return {"state": runner.STATE, "schedule": _schedule_view(), "counts": store.counts(), "runs": store.last_runs(10), "catalog": cat_info,
             "settings": {"provider": "Ollama", "guardian_model": get_router().config["governance"]["guardian"]["model"],
                          "model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
                          "hil_detail": hil_detail(), "github_mode": gh["mode"], "github_repo": gh["repo"],
@@ -241,6 +241,53 @@ def stop_run(request: Request, user: str = Depends(admin)):
     store.audit("run_stop_requested", actor=user, address=_client(request))
     activity.emit("run", f"Stop requested by {user}: the current item finishes, then the run stops", "warn")
     return {"status": "stopping"}
+
+
+def _schedule_view() -> dict:
+    import time as _time
+    s = runner.schedule()
+    return {**s, "timezone": _time.tzname[_time.daylight and _time.localtime().tm_isdst] or "local",
+            "next_run": runner.STATE.get("next_run")}
+
+
+@app.get("/api/schedule")
+def get_schedule(_: str = Depends(login)):
+    return _schedule_view()
+
+
+class Schedule(BaseModel):
+    enabled: bool = True
+    time: str = "06:00"
+
+
+@app.put("/api/schedule")
+def put_schedule(body: Schedule, request: Request, user: str = Depends(admin)):
+    if not runner.valid_hhmm(body.time):
+        raise HTTPException(400, "time must be HH:MM (24-hour), e.g. 06:00")
+    before = runner.schedule()
+    store.set_setting("schedule", {"enabled": body.enabled, "time": body.time}, user)
+    store.audit("schedule_changed", actor=user, address=_client(request),
+                before={k: before[k] for k in ("enabled", "time")}, after={"enabled": body.enabled, "time": body.time})
+    nxt = runner.next_run_after(__import__("datetime").datetime.now(), body.time) if body.enabled else None
+    runner.STATE["next_run"] = nxt.isoformat(timespec="minutes") if nxt else None
+    return _schedule_view()
+
+
+@app.get("/api/runs/{run_id}/report.html")
+def run_report(run_id: int, download: bool = False, user: str = Depends(login)):
+    try:
+        version = catalog.load().get("framework_version")
+    except Exception:
+        version = None
+    page = report.build(run_id, viewer(user), sensitive, {
+        "model": analysis_model(), "framework_version": version,
+        "guardian_model": get_router().config["governance"]["guardian"]["model"]})
+    if page is None:
+        raise HTTPException(404, "no such run")
+    headers = {"Cache-Control": "no-store"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="k9x-sentinel-run-{run_id}.html"'
+    return HTMLResponse(page, headers=headers)
 
 
 class Requeue(BaseModel):

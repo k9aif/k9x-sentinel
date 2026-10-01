@@ -23,6 +23,15 @@
   button:disabled { opacity:.5; cursor:default; }
   button.danger { background:var(--gap); border-color:var(--gap); color:#fff; }
   #models { font-size:12.5px; }
+  .schedtop { font-size:12.5px; padding:3px 10px; border-radius:12px; border:1px solid var(--line); color:var(--mute); }
+  .schedtop b { color:var(--ink); }
+  .runs { margin:6px 0 0; padding:0; list-style:none; font-size:12.5px; }
+  .runs li { display:flex; gap:6px; align-items:baseline; }
+  .runs a { color:var(--accent); }
+  .sched { display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .sched input[type=time] { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px;
+                            background:var(--card); color:var(--ink); }
+  .sched button { padding:3px 10px; }
   .requeue { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 10px; }
   .requeue input { width:70px; font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px;
                    background:var(--card); color:var(--ink); }
@@ -120,6 +129,7 @@
   <img src="/logo.svg" alt="" width="30" height="34">
   <h1>K9X Sentinel</h1>
   <span class="mute" id="models" title="Provider · analysis model · screening model"></span>
+  <span class="schedtop" id="schedtop"></span>
   <span class="sub">threat watch for the K9-AIF framework</span>
   <nav class="views"><button data-view="findings" class="on">Findings</button><button data-view="hil">HIL History</button><button data-view="architecture">Architecture</button><a class="navlink" href="/about">About</a></nav>
   <span class="spacer"></span>
@@ -200,13 +210,24 @@ async function api(path, opts) {
 function card(k, v) { return `<div class="card"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`; }
 
 async function loadStatus() {
+  const editing = document.activeElement && ["schedtime", "schedon"].includes(document.activeElement.id);
+  if (editing) return;
   const s = await api("/api/status");
   const last = s.runs[0];
-  const lastTxt = last ? `${esc(last.status)} · ${new Date(last.started * 1000).toLocaleString()}` : "never";
+  const lastTxt = last ? `${esc(last.status)} · ${new Date(last.started * 1000).toLocaleString()}` +
+    `<ul class="runs">${s.runs.slice(0, 5).map(r => `<li><span class="mute">#${r.id}</span> ${esc(r.status)} · ${new Date(r.started * 1000).toLocaleDateString()}
+      <a href="/api/runs/${r.id}/report.html" target="_blank" rel="noopener">report</a></li>`).join("")}</ul>` : "never";
   const v = s.counts.verdict, st = s.counts.status;
   document.getElementById("cards").innerHTML =
     card("Last run", lastTxt) +
-    card("Next run", esc(s.state.next_run || s.settings.run_at)) +
+    card("Schedule", (s.schedule.enabled
+        ? `Daily at <b>${esc(s.schedule.time)}</b> <span class="mute">${esc(s.schedule.timezone)}</span>
+           <div class="note">next: ${esc((s.schedule.next_run || "").replace("T", " ")) || "—"} · ${s.schedule.source === "admin" ? "set here" : "default from .env"}</div>`
+        : `<span class="partial">Paused</span><div class="note">no scheduled runs · Run now still works</div>`) +
+      (ROLE === "admin" ? `<div class="sched" id="sched">
+         <input type="time" id="schedtime" value="${esc(s.schedule.time)}">
+         <label><input type="checkbox" id="schedon" ${s.schedule.enabled ? "checked" : ""}> on</label>
+         <button id="schedsave">Save</button><span class="note" id="schedmsg"></span></div>` : "")) +
     card("Waiting for review", esc(st.pending_hil || 0)) +
     card("Verdicts", `<span class="gap">${v.gap || 0} gap</span> · <span class="partial">${v.partial || 0} partial</span> · <span class="covered">${v.covered || 0} covered</span>`) +
     card("Catalog", s.catalog.error ? `<span class="gap">${esc(s.catalog.error)}</span>` :
@@ -222,6 +243,10 @@ async function loadStatus() {
     rb.disabled = stopping;
     if (!s.state.running) rb.dataset.stopping = "";
   }
+  const nr = s.schedule.next_run ? new Date(s.schedule.next_run) : null;
+  document.getElementById("schedtop").innerHTML = s.schedule.enabled
+    ? `Scheduled daily at <b>${esc(s.schedule.time)}</b> ${esc(s.schedule.timezone)}${nr ? ` · next <b>${nr.toLocaleDateString([], {weekday: "short", month: "short", day: "numeric"})}, ${esc(s.schedule.time)}</b>` : ""}`
+    : `<span class="partial">Schedule paused</span>`;
   document.getElementById("models").textContent =
     `${s.settings.provider} · ${s.settings.model} · Guardian ${s.settings.guardian_model}`;
   if (s.state.running && document.getElementById("live").hidden && !liveTimer) { showLive(true); pollLive(); }
@@ -240,6 +265,16 @@ document.getElementById("requeuebtn").addEventListener("click", async () => {
     document.getElementById("requeuemsg").textContent = `${r.requeued} item(s) queued: click Run now (the pre-filter and duplicate check apply).`;
     loadItems(); loadStatus();
   } catch (err) { document.getElementById("requeuemsg").textContent = err.message; }
+});
+document.getElementById("cards").addEventListener("click", async e => {
+  if (e.target.id !== "schedsave") return;
+  const time = document.getElementById("schedtime").value, enabled = document.getElementById("schedon").checked;
+  try {
+    const r = await api("/api/schedule", {method: "PUT", headers: {"Content-Type": "application/json"},
+                                          body: JSON.stringify({time, enabled})});
+    document.getElementById("schedmsg").textContent = r.enabled ? `saved · next ${String(r.next_run || "").replace("T", " ")}` : "saved · paused";
+    setTimeout(loadStatus, 1200);
+  } catch (err) { document.getElementById("schedmsg").textContent = err.message; }
 });
 async function loadItems() {
   document.getElementById("requeue").hidden = !(ROLE === "admin" && TABS[tab][1].status === "baseline");
