@@ -1,0 +1,41 @@
+# K9X Sentinel — single container: FastAPI (API + UI), the daily scheduler and
+# the HIL reply listener.
+#
+# k9-aif installs from PyPI via requirements.txt. Secrets and settings come
+# from .env at run time (--env-file), never baked into the image.
+#
+# runtime/ (sentinel.db, hil_pending.db, the router's db) is a mounted volume
+# so findings and pending HIL cases survive rebuilds — see build-run.sh.
+#
+# Build (from this project's own directory; build-run.sh does this):
+#   podman build -t k9x-sentinel:latest -f ubuntu/Containerfile .
+
+FROM registry.access.redhat.com/ubi9/python-311:latest
+USER root
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+RUN mkdir -p /app/runtime /app/logs \
+ && chown -R 1001:0 /app/runtime /app/logs && chmod -R g+rwX /app/runtime /app/logs
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SENTINEL_DB_PATH=/app/runtime/sentinel.db \
+    SENTINEL_HIL_DB_PATH=/app/runtime/hil_pending.db
+
+EXPOSE 8114
+
+HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8114/api/health')" \
+      || exit 1
+
+USER 1001
+
+# Pre-flight first: Ollama reachable, analysis model and Granite Guardian
+# pulled, catalog readable. A failed check stops the container with the
+# reason in `build-run.sh logs`.
+CMD ["sh", "-c", "python -m sentinel.preflight && exec uvicorn sentinel.api:app --host 0.0.0.0 --port 8114 --log-level info"]

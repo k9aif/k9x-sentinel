@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Releases</title>
+<entry><id>tag:github.com,2008:Repository/1/v5.0.0</id><title>v5.0.0</title>
+<updated>2026-09-28T12:00:00Z</updated>
+<link rel="alternate" type="text/html" href="https://github.com/mitre-atlas/atlas-data/releases/tag/v5.0.0"/>
+<content type="html">&lt;p&gt;New techniques for agent memory poisoning&lt;/p&gt;</content></entry>
+</feed>

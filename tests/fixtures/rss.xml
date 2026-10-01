@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel><title>Research</title>
+<item><title>Agents phishing agents: a &lt;b&gt;new&lt;/b&gt; technique</title>
+<link>https://example.com/a1</link><guid>https://example.com/a1</guid>
+<pubDate>Tue, 29 Sep 2026 10:00:00 GMT</pubDate>
+<description><![CDATA[<p>Attackers plant instructions in <script>alert(1)</script>tool output.</p>]]></description></item>
+<item><title>Old post</title><link>https://example.com/old</link>
+<pubDate>Mon, 05 Jan 2026 10:00:00 GMT</pubDate><description>old</description></item>
+</channel></rss>

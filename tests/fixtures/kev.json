@@ -1,0 +1,6 @@
+{"vulnerabilities": [
+ {"cveID": "CVE-2026-1111", "vendorProject": "Acme", "product": "Router", "vulnerabilityName": "Acme Router RCE",
+  "dateAdded": "2026-09-20", "shortDescription": "Remote code execution.", "requiredAction": "Patch."},
+ {"cveID": "CVE-2026-2222", "vendorProject": "Ollama", "product": "Ollama", "vulnerabilityName": "Ollama path traversal",
+  "dateAdded": "2026-09-25", "shortDescription": "Model pull path traversal.", "requiredAction": "Update."}
+]}

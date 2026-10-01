@@ -1,0 +1,3 @@
+# K9X Sentinel agent behaviour (merged over config.yaml)
+role: "Security architect"
+goal: "Decide whether the framework's capability catalog covers the threat, with evidence."

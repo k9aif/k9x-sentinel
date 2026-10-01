@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# K9X Sentinel — squad flow definitions (loaded by SquadLoader.load_one).
+# No orchestrator field: squads never reference their caller.
+
+squads:
+  CollectSquad:
+    description: Read every source and store new items (feeds, then the dependency audit).
+    agents: [FeedCollectorAgent, DependencyAuditAgent]
+    flow:
+      - agent: FeedCollectorAgent
+        result_key: feeds
+      - agent: DependencyAuditAgent
+        result_key: dependencies
+
+  AssessSquad:
+    description: One item — screen it, compare it with the capability catalog, triage it.
+    agents: [ContentScreenAgent, GapAnalysisAgent, TriageAgent]
+    flow:
+      - agent: ContentScreenAgent
+        result_key: screened
+      - agent: GapAnalysisAgent
+        result_key: assessment
+      - agent: TriageAgent
+        result_key: triage
+
+  DecisionSquad:
+    description: A reviewer decided in k9x-hil — record it and act on an approval.
+    agents: [DecisionAgent]
+    flow:
+      - agent: DecisionAgent
+        result_key: decision

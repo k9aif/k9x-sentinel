@@ -1,0 +1,99 @@
+# K9X Sentinel configuration: *how* Sentinel behaves.
+# *Where* and *which* (Ollama host, models, Kafka, GitHub) live in .env.
+# ${VAR:-default} is expanded from the environment by the framework's load_yaml.
+
+sentinel:
+  # Items published more than this many days before Sentinel first sees a
+  # source are recorded as baseline and not assessed (no backlog flood on day one).
+  lookback_days: 14
+  max_items_per_source: 25
+  article_chars: 12000          # article text given to the analysis model
+  fetch_timeout_s: 20
+  user_agent: "K9X-Sentinel/0.1 (+https://github.com/k9aif/k9x-sentinel)"
+
+  # Raise a HIL case when the verdict is gap or partial and:
+  triage:
+    min_confidence: 0.5
+    min_severity: medium            # low | medium | high | critical
+    # A threat that maps to an already-known gap is recorded against it, not
+    # raised again, unless its severity is at or above this:
+    known_gap_reraise_severity: high
+
+  hil:
+    queue: framework_security_updates
+
+  sources:
+    - id: threatlabz
+      name: Zscaler ThreatLabz research
+      kind: rss
+      url: https://www.zscaler.com/blogs/feeds/security-research
+      fetch_article: true
+    - id: owasp_genai
+      name: OWASP GenAI Security Project
+      kind: rss
+      url: https://genai.owasp.org/feed/
+      fetch_article: true
+    - id: owasp_llm_top10_releases
+      name: OWASP Top 10 for LLM Applications (releases)
+      kind: atom
+      url: https://github.com/OWASP/www-project-top-10-for-large-language-model-applications/releases.atom
+      fetch_article: false
+    - id: mitre_atlas_releases
+      name: MITRE ATLAS (releases)
+      kind: atom
+      url: https://github.com/mitre-atlas/atlas-data/releases.atom
+      fetch_article: false
+    - id: willison_prompt_injection
+      name: Simon Willison — prompt injection
+      kind: atom
+      url: https://simonwillison.net/tags/prompt-injection.atom
+      fetch_article: false
+    - id: embracethered
+      name: Embrace The Red (agent security research)
+      kind: rss
+      url: https://embracethered.com/blog/index.xml
+      fetch_article: true
+    - id: cisa_kev
+      name: CISA Known Exploited Vulnerabilities
+      kind: cisa_kev
+      url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+      fetch_article: false
+      # KEV is mostly unrelated products; only entries matching these reach the model.
+      keywords: [llm, "large language model", "artificial intelligence", "ai agent", langchain, llamaindex,
+                 ollama, python, pypi, kafka,
+                 redpanda, keycloak, postgres, fastapi, uvicorn, pydantic, jwt, oauth, openid, mcp,
+                 "model context protocol", vllm, hugging, chroma, neo4j, minio]
+    - id: osv_dependencies
+      name: OSV — k9-aif dependencies
+      kind: osv
+      url: https://api.osv.dev/v1/query
+      package: k9-aif
+
+governance:
+  guardian:
+    enabled: true                   # fixed: Sentinel always screens with Guardian
+    model: "${SENTINEL_GUARDIAN_MODEL:-granite4.1-guardian:8b}"
+    on_unavailable: fail_closed     # fixed
+    timeout: 90
+    ingress_risks: [process_manipulation]
+
+security:
+  shield:
+    enabled: true
+    strict: false
+    ingress:
+      checks: [InputSizeCheck, PromptInjectionCheck, SemanticDriftCheck]
+    egress:
+      checks: [OutputSanitizationCheck]
+    check_config:
+      InputSizeCheck:
+        max_chars: 60000
+
+routing:
+  hil:
+    prefix: "hil."
+    # Only this app's replies (k9x-hil carries other apps' queues too)
+    reply_pattern: 'hil\.replies\.framework_security_updates'
+
+hil:
+  db_path: "${SENTINEL_HIL_DB_PATH:-./runtime/hil_pending.db}"

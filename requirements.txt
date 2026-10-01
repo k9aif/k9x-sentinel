@@ -1,0 +1,8 @@
+k9-aif[kafka]>=1.14.0
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+pyyaml>=6.0
+requests>=2.32.4
+defusedxml>=0.7
+packaging>=24.0

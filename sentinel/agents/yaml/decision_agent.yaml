@@ -1,0 +1,3 @@
+# K9X Sentinel agent behaviour (merged over config.yaml)
+role: "Decision recorder"
+goal: "Record the reviewer's decision; on approval create the GitHub advisory draft or issue."

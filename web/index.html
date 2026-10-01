@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K9X Sentinel</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#5d6678; --line:#e1e4ea; --accent:#2f5bd3;
+          --gap:#c0392b; --partial:#c27c0e; --covered:#1e8449; --dep:#6c3fb5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151b; --card:#1a1f27; --ink:#e6e9ef; --mute:#9aa3b5; --line:#2a313d; --accent:#7ea0ff;
+            --gap:#ff7b6b; --partial:#f0b44c; --covered:#5fd38d; --dep:#b593ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { color:var(--mute); }
+  header .spacer { flex:1; }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); padding:6px 12px; border-radius:6px; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  main { padding:16px 24px 48px; max-width:1300px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .card .k { color:var(--mute); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .card .v { font-size:15px; margin-top:4px; word-break:break-word; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 12px; }
+  .tabs button.on { border-color:var(--accent); color:var(--accent); }
+  .wrap { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mute); font-weight:600; font-size:12px; }
+  tr.row { cursor:pointer; } tr.row:hover { background:color-mix(in srgb, var(--accent) 6%, transparent); }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; border:1px solid currentColor; }
+  .gap { color:var(--gap); } .partial { color:var(--partial); } .covered { color:var(--covered); }
+  .dependency { color:var(--dep); } .mute { color:var(--mute); }
+  #detail { margin-top:16px; }
+  #detail h2 { font-size:16px; margin:0 0 6px; }
+  #detail dl { display:grid; grid-template-columns:170px 1fr; gap:6px 14px; margin:12px 0; }
+  #detail dt { color:var(--mute); }
+  #detail dd { margin:0; white-space:pre-wrap; word-break:break-word; }
+  pre { white-space:pre-wrap; word-break:break-word; background:var(--bg); padding:10px; border-radius:6px; max-height:360px; overflow:auto; }
+  .note { color:var(--mute); font-size:12px; }
+  @media (max-width: 640px) { #detail dl { grid-template-columns:1fr; } header, main { padding-left:16px; padding-right:16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>K9X Sentinel</h1>
+  <span class="sub">threat watch for the K9-AIF framework</span>
+  <span class="spacer"></span>
+  <span id="runstate" class="mute"></span>
+  <button id="runbtn" class="primary">Run now</button>
+</header>
+<main>
+  <div class="cards" id="cards"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="wrap"><table>
+    <thead><tr><th>#</th><th>Finding</th><th>Source</th><th>Verdict</th><th>Severity</th><th>Status</th><th>Published</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div id="detail" class="card" hidden></div>
+  <p class="note">Private. Findings describe gaps that may not be fixed yet: never expose this UI publicly.</p>
+</main>
+<script>
+const TABS = [
+  ["Needs review", {status: "pending_hil"}], ["Gaps", {verdict: "gap"}], ["Partial", {verdict: "partial"}],
+  ["Covered", {verdict: "covered"}], ["Not relevant", {verdict: "not_relevant"}], ["Decided", {status: "decided"}],
+  ["Errors", {status: "error"}], ["Failed", {status: "failed"}], ["Unsent (no Kafka)", {status: "hil_failed"}], ["All", {}],
+];
+let tab = 0;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const when = t => t ? new Date(t * 1000).toLocaleDateString() : "—";
+const pill = v => v ? `<span class="pill ${esc(v)}">${esc(v.replace("_", " "))}</span>` : `<span class="mute">—</span>`;
+async function api(path, opts) {
+  const r = await fetch(path, {credentials: "same-origin", ...opts});
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+function card(k, v) { return `<div class="card"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`; }
+
+async function loadStatus() {
+  const s = await api("/api/status");
+  const last = s.runs[0];
+  const lastTxt = last ? `${esc(last.status)} · ${new Date(last.started * 1000).toLocaleString()}` : "never";
+  const v = s.counts.verdict, st = s.counts.status;
+  document.getElementById("cards").innerHTML =
+    card("Last run", lastTxt) +
+    card("Next run", esc(s.state.next_run || s.settings.run_at)) +
+    card("Waiting for review", esc(st.pending_hil || 0)) +
+    card("Verdicts", `<span class="gap">${v.gap || 0} gap</span> · <span class="partial">${v.partial || 0} partial</span> · <span class="covered">${v.covered || 0} covered</span>`) +
+    card("Catalog", s.catalog.error ? `<span class="gap">${esc(s.catalog.error)}</span>` :
+         `k9-aif ${esc(s.catalog.framework_version)} · ${esc(s.catalog.capabilities)} controls · ${esc(s.catalog.known_gaps)} known gaps<div class="note">${esc(s.catalog.origin)}</div>`) +
+    card("Pipeline", `${esc(s.settings.model)} · HIL ${s.settings.hil ? esc(s.settings.hil_detail) : "off"} · GitHub ${esc(s.settings.github_mode)}`);
+  document.getElementById("runstate").textContent = s.state.running ? `running: ${s.state.phase}${s.state.item ? " · item " + s.state.item : ""}` : "";
+  document.getElementById("runbtn").disabled = s.state.running;
+}
+
+function drawTabs() {
+  document.getElementById("tabs").innerHTML = TABS.map((t, i) =>
+    `<button class="${i === tab ? "on" : ""}" data-i="${i}">${esc(t[0])}</button>`).join("");
+}
+
+async function loadItems() {
+  const q = new URLSearchParams(TABS[tab][1]).toString();
+  const rows = await api("/api/items" + (q ? "?" + q : ""));
+  document.getElementById("rows").innerHTML = rows.length ? rows.map(r => `
+    <tr class="row" data-id="${r.id}">
+      <td>${r.id}</td><td>${esc(r.title)}</td><td class="mute">${esc(r.source)}</td>
+      <td>${pill(r.kind === "dependency" && r.verdict === "gap" ? "dependency" : r.verdict)}</td>
+      <td>${esc(r.severity || "—")}</td><td class="mute">${esc(r.status)}</td><td class="mute">${when(r.published || r.first_seen)}</td>
+    </tr>`).join("") : `<tr><td colspan="7" class="mute">Nothing here.</td></tr>`;
+}
+
+async function showItem(id) {
+  const it = await api(`/api/items/${id}`);
+  const a = it.assessment || {}, d = it.decision, act = it.action, sc = it.screen || {};
+  const box = document.getElementById("detail");
+  box.hidden = false;
+  box.innerHTML = `
+    <h2>#${it.id} · ${esc(it.title)}</h2>
+    <div>${pill(it.kind === "dependency" ? "dependency" : a.verdict)} <span class="mute">${esc(it.status)}</span>
+      ${it.link ? ` · <a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</div>
+    <dl>
+      <dt>Threat</dt><dd>${esc(a.threat || "—")}</dd>
+      <dt>Severity · confidence</dt><dd>${esc(a.severity || "—")} · ${esc(a.confidence ?? "—")}</dd>
+      <dt>OWASP</dt><dd>${esc((a.taxonomy || []).join(", ") || "—")}</dd>
+      <dt>Relevant controls</dt><dd>${esc((a.matched_capabilities || []).join(", ") || "none")}</dd>
+      <dt>Known gap</dt><dd>${esc(a.known_gap || "—")}</dd>
+      <dt>Rationale</dt><dd>${esc(a.rationale || "—")}</dd>
+      <dt>Suggested fix</dt><dd>${esc(a.suggested_fix || "—")}</dd>
+      <dt>Screening</dt><dd>${sc.screened ? (sc.flagged ? `<span class="partial">flagged: content contains injection or manipulation text (analysed, not obeyed)</span>\n${esc(sc.reason)}` : "clean") : "not screened (no model reads it)"}</dd>
+      <dt>Assessed against</dt><dd>${esc(a.framework_version ? "k9-aif " + a.framework_version : "—")} <span class="note">${esc(a.catalog_origin || "")}</span></dd>
+      <dt>HIL case</dt><dd>${esc(it.correlation_id || "—")}</dd>
+      <dt>Decision</dt><dd>${d ? esc(`${d.outcome} by ${d.actor || "?"}${d.comment ? ": " + d.comment : ""}`) : "—"}</dd>
+      <dt>GitHub</dt><dd>${act ? (act.url ? `<a href="${esc(act.url)}" target="_blank" rel="noopener noreferrer">${esc(act.kind)}</a>` : `${esc(act.mode)} · ${esc(act.kind)}${act.error ? " · " + esc(act.error) : ""}`) : "—"}</dd>
+      <dt>Error</dt><dd>${esc(it.error || "—")}</dd>
+    </dl>
+    ${act && act.request ? `<div class="note">Request that would be sent (dry run):</div><pre>${esc(JSON.stringify(act.request, null, 2))}</pre>` : ""}
+    <details><summary class="mute">Text the model read</summary><pre>${esc(it.content || it.summary || "")}</pre></details>`;
+  box.scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  tab = +b.dataset.i; drawTabs(); loadItems();
+});
+document.getElementById("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr.row"); if (tr) location.hash = "item-" + tr.dataset.id;
+});
+document.getElementById("runbtn").addEventListener("click", async () => {
+  try { await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); }
+  catch (err) { document.getElementById("runstate").textContent = err.message; }
+  loadStatus();
+});
+window.addEventListener("hashchange", route);
+function route() { const m = location.hash.match(/^#item-(\d+)$/); if (m) showItem(+m[1]); }
+
+drawTabs(); loadStatus(); loadItems(); route();
+setInterval(() => { loadStatus(); loadItems(); }, 15000);
+</script>
+</body>
+</html>
