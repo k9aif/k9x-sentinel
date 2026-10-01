@@ -22,7 +22,8 @@ of how it got there is in ``audit_events``.
             pending_hil  raised to k9x-hil, waiting for a decision
             hil_failed   raised but Kafka was unavailable; retried next run
             decided      a reviewer approved, rejected or the case expired
-            error        assessment failed; retried next run (up to 3 attempts)
+            error        assessment failed; retried next run (up to 3 attempts; a model
+                         backend outage does not count as an attempt)
             failed       assessment failed 3 times; left for a person to look at
             duplicate    same finding as one already sent for review (data.duplicate_of); not raised
 """

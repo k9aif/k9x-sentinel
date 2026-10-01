@@ -77,7 +77,13 @@ def inference_config() -> Dict[str, Any]:
         },
         "llm_factory": {
             "backend": "ollama", "provider": "ollama", "base_url": ollama_base_url(),
-            "models": {"analyst": {"model": analysis_model(), "temperature": 0.1, "max_tokens": 4096}},
+            # num_ctx: the article plus the capability catalog does not fit Ollama's default 4096.
+            # think: off; hidden reasoning makes every answer far slower and adds nothing to a JSON verdict.
+            # timeout: honoured by k9-aif >= 1.14.1 (120 s before).
+            "models": {"analyst": {"model": analysis_model(), "temperature": 0.1, "max_tokens": 4096,
+                                   "num_ctx": int(os.environ.get("SENTINEL_NUM_CTX", "16384")),
+                                   "think": False,
+                                   "timeout": int(os.environ.get("SENTINEL_LLM_TIMEOUT_S", "600"))}},
         },
         "model_catalog": {
             "default_model": "analyst",

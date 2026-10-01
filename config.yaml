@@ -8,6 +8,10 @@ sentinel:
   lookback_days: 14
   max_items_per_source: 25
   article_chars: 12000          # article text given to the analysis model
+  # Model backend down or too slow (Ollama unreachable, GPU lost, timeouts):
+  # pause and retry the same item after each of these waits (seconds); still
+  # down after the last one -> the run stops and the rest waits for the next run.
+  backend_retry_pauses_s: [60, 120, 300]
   fetch_timeout_s: 20
   user_agent: "K9X-Sentinel/0.1 (+https://github.com/k9aif/k9x-sentinel)"
 

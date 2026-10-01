@@ -112,6 +112,13 @@ class AssessOrchestrator(_SentinelOrchestrator):
 
     @staticmethod
     def _failed(item_id: int, exc: Exception) -> Dict[str, Any]:
+        if backend_down(exc):
+            # Not the item's fault: no attempt is counted; the runner pauses and retries it.
+            store.update_item(item_id, status="error", error=f"model backend unavailable: {str(exc)[:300]}")
+            store.audit("assessment_deferred", item_id, reason="model backend unavailable", error=str(exc)[:300])
+            activity.emit("compare", "model backend unavailable (Ollama down, no GPU, or timing out)", "error",
+                          item=item_id)
+            return {"status": "backend_unavailable", "item_id": item_id, "error": str(exc)[:300]}
         item = store.get_item(item_id) or {}
         data = dict(item.get("data") or {})
         data["attempts"] = int(data.get("attempts", 0)) + 1
@@ -123,6 +130,15 @@ class AssessOrchestrator(_SentinelOrchestrator):
         store.audit("assessment_failed", item_id, attempt=data["attempts"], final=status == "failed",
                     error=f"{exc.__class__.__name__}: {exc}"[:500])
         return {"status": status, "item_id": item_id, "error": str(exc)[:300]}
+
+
+_BACKEND_DOWN = ("llm backend unavailable", "ollama connection failed", "cannot connect", "connection refused",
+                 "timed out", "timeout", "name or service not known", "temporarily unavailable")
+
+
+def backend_down(exc: Exception) -> bool:
+    text = f"{exc.__class__.__name__}: {exc}".lower()
+    return any(marker in text for marker in _BACKEND_DOWN)
 
 
 def assess_queue() -> List[int]:

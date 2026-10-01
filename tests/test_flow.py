@@ -246,3 +246,52 @@ def test_prefilter_ignores_user_agent_headers_and_marketing_footers():
     assert prefilter_match("Vidar update\n" + footer[:n], terms, ignore) is None
     assert prefilter_match("Attackers hijack an AI agent through MCP tools\n...", terms, ignore) == "ai"
     assert prefilter_match("Phishing kit\nThe kit uses an LLM to write lures.", terms, ignore) == "llm"
+
+
+
+def test_backend_outage_pauses_retries_then_stops_without_burning_attempts(shield_only, monkeypatch):
+    from sentinel import runner
+    from sentinel.agents import assess_agents as aa
+    calls = {"n": 0}
+
+    def down(self, prompt, system_prompt, task_type="analysis"):
+        calls["n"] += 1
+        raise RuntimeError("LLM backend unavailable (agent=GapAnalysisAgent) [WARN] Ollama connection failed")
+    monkeypatch.setattr(aa.GapAnalysisAgent, "ask", down)
+    slept = []
+    monkeypatch.setattr(runner.time, "sleep", lambda s: slept.append(s))
+    router = build(FakeBus())
+    router.config["sentinel"]["backend_retry_pauses_s"] = [1, 2]
+    router.config["sentinel"]["sources"] = []
+    monkeypatch.setattr(runner, "get_router", lambda: router)
+    a = article()
+    b = store.add_item({"uid": "t:2", "source": "willison_prompt_injection", "kind": "article", "title": "Two",
+                        "content": "x"})
+    out = runner.run_once()
+    assert out["status"] == "stopped" and slept == [1, 2] and calls["n"] == 3
+    assert out["assessed"]["deferred"] == 2
+    ia, ib = store.get_item(a), store.get_item(b)
+    assert ia["status"] == "error" and (ia["data"] or {}).get("attempts") is None    # no attempt counted
+    assert ib["status"] == "new"                                                     # never touched
+    assert store.last_runs(1)[0]["status"] == "stopped"
+
+
+def test_a_slow_answer_after_a_pause_continues_the_run(shield_only, model, monkeypatch):
+    from sentinel import runner
+    from sentinel.agents import assess_agents as aa
+    real = aa.GapAnalysisAgent.ask
+    state = {"first": True}
+
+    def flaky(self, prompt, system_prompt, task_type="analysis"):
+        if state["first"]:
+            state["first"] = False
+            raise RuntimeError("LLM backend unavailable: TimeoutError timed out")
+        return real(self, prompt, system_prompt, task_type)
+    monkeypatch.setattr(aa.GapAnalysisAgent, "ask", flaky)
+    monkeypatch.setattr(runner.time, "sleep", lambda s: None)
+    router = build(FakeBus())
+    router.config["sentinel"]["sources"] = []
+    monkeypatch.setattr(runner, "get_router", lambda: router)
+    item = article()
+    out = runner.run_once()
+    assert out["status"] == "completed" and store.get_item(item)["status"] == "pending_hil"
