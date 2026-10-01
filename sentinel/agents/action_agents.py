@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from sentinel import github_actions, store
+from sentinel import activity, github_actions, store
 from sentinel.agents.common import SentinelAgent
 from sentinel.settings import hil_approvers
 
@@ -40,4 +40,6 @@ class DecisionAgent(SentinelAgent):
             version = (item.get("assessment") or {}).get("framework_version") or "unknown"
             action = github_actions.perform(item, version)
         store.update_item(item["id"], status="decided", decision=record, action=action)
+        activity.emit("decision", f"#{item['id']} {outcome} by {decision.get('actor') or '?'}"
+                      + (f" → GitHub {action['kind']} ({action['mode']})" if action else ""), "ok", item=item["id"])
         return {"outcome": outcome, "action": action}

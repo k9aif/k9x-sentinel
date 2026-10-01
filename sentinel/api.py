@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from sentinel import auth, catalog, runner, store
+from sentinel import activity, auth, catalog, runner, store
 from sentinel.router.sentinel_router import get_router
 from sentinel.settings import (REPO_URL, analysis_model, credentials, github, hil_detail, kafka_broker, run_at)
 
@@ -105,6 +105,7 @@ def status(_: str = Depends(login)):
             "settings": {"model": analysis_model(), "run_at": run_at(), "hil": bool(kafka_broker()),
                          "hil_detail": hil_detail(), "github_mode": gh["mode"], "github_repo": gh["repo"],
                          "github_token": bool(gh["token"])},
+            "sources": [{"id": src["id"], "name": src.get("name", src["id"])} for src in get_router().config["sentinel"]["sources"]],
             "repo": REPO_URL}
 
 
@@ -120,6 +121,12 @@ def item(item_id: int, _: str = Depends(login)):
     if not found:
         raise HTTPException(404, "not found")
     return found
+
+
+@app.get("/api/activity")
+def live(since: int = 0, _: str = Depends(login)):
+    return {"running": runner.STATE["running"], "phase": runner.STATE["phase"],
+            "current": activity.current(), "events": activity.since(since)}
 
 
 class RunRequest(BaseModel):

@@ -97,3 +97,17 @@ def test_sign_out_wins_over_remembered_browser_basic_credentials(client, monkeyp
     assert "SIGN IN TO K9X SENTINEL" in page.text
     assert client.get("/api/items", auth=("admin", "s3cret")).status_code == 401
     assert client.get("/api/items", auth=("admin", "s3cret"), headers=SCRIPT).status_code == 200
+
+
+def test_live_activity_feed(client, monkeypatch):
+    from sentinel import activity
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    assert client.get("/api/activity").status_code == 401
+    start = activity.current()["last_seq"]
+    activity.emit("sources", "Connecting to OSV …", source="osv_dependencies")
+    activity.emit("compare", "verdict: gap · high · confidence 0.9", "error", item=7)
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    d = client.get(f"/api/activity?since={start}").json()
+    assert [e["msg"] for e in d["events"]] == ["Connecting to OSV …", "verdict: gap · high · confidence 0.9"]
+    assert d["current"]["stage"] == "compare" and d["current"]["item"] == 7
+    assert client.get(f"/api/activity?since={d['current']['last_seq']}").json()["events"] == []

@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sentinel import store
+from sentinel import activity, store
 from sentinel.orchestrators.sentinel_orchestrators import assess_queue
 from sentinel.router.sentinel_router import get_router
 from sentinel.settings import run_at
@@ -32,26 +32,32 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
     run_id = store.start_run()
     STATE.update(running=True, phase="collecting", item=None)
     stats: Dict[str, Any] = {}
+    activity.emit("run", f"Run #{run_id} started")
     try:
         router = get_router()
         stats["sources"] = router.route({"event_type": "sentinel.scan", "sources": sources or []})["sources"]
         outcomes: Counter = Counter()
         queue = assess_queue()
         STATE["phase"] = f"assessing {len(queue)}"
-        for item_id in queue:
+        activity.emit("run", f"{len(queue)} item(s) to assess")
+        for n, item_id in enumerate(queue, 1):
             STATE["item"] = item_id
+            STATE["phase"] = f"assessing {n} of {len(queue)}"
             result = router.route({"event_type": "sentinel.assess", "item_id": item_id})
             outcomes[result.get("status", "unknown")] += 1
         stats["assessed"] = dict(outcomes)
         store.finish_run(run_id, "completed", stats)
+        activity.emit("run", "Run #%d completed · %s" % (run_id, ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in outcomes.items()) or "nothing new"), "ok")
         log.info("[Sentinel] run %d completed: %s", run_id, stats)
         return {"status": "completed", "run_id": run_id, **stats}
     except Exception as exc:
         log.exception("[Sentinel] run %d failed", run_id)
         store.finish_run(run_id, "failed", stats, f"{exc.__class__.__name__}: {exc}"[:500])
+        activity.emit("run", f"Run #{run_id} failed: {exc}", "error")
         return {"status": "failed", "run_id": run_id, "error": str(exc)}
     finally:
         STATE.update(running=False, phase="", item=None)
+        activity.reset_current()
         _RUN_LOCK.release()
 
 

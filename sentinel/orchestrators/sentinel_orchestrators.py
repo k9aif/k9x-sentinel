@@ -24,7 +24,7 @@ from k9_aif_abb.k9_core.orchestration.hil_signal import RequiresHIL
 from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
 from k9_aif_abb.k9_squad.squad_loader import SquadLoader
 
-from sentinel import store
+from sentinel import activity, store
 from sentinel.agents.action_agents import DecisionAgent
 from sentinel.agents.assess_agents import ContentScreenAgent, GapAnalysisAgent, TriageAgent
 from sentinel.agents.collect_agents import DependencyAuditAgent, FeedCollectorAgent
@@ -88,10 +88,13 @@ class AssessOrchestrator(_SentinelOrchestrator):
             # Without Kafka the case would be recorded as pending but never reach
             # k9x-hil; keep it visible and retry it on the next run instead.
             store.update_item(item_id, status="hil_failed", error="Kafka unavailable: HIL case not sent")
+            activity.emit("hil", "Kafka not configured / unreachable: kept, will be sent on the next run", "warn", item=item_id)
             return {"status": "hil_failed", "item_id": item_id}
         resume = {"event_type": "sentinel.assess", "item_id": item_id}
         out = self.handle_requires_hil(exc, resume)
         store.update_item(item_id, status="pending_hil", correlation_id=out.get("correlation_id"), error=None)
+        activity.emit("hil", f"Published to k9x-hil · {out.get('reply_to', '').replace('replies', 'requests')}", "ok",
+                      item=item_id)
         return {**out, "item_id": item_id}
 
     @staticmethod
@@ -101,6 +104,8 @@ class AssessOrchestrator(_SentinelOrchestrator):
         data["attempts"] = int(data.get("attempts", 0)) + 1
         status = "failed" if data["attempts"] >= MAX_ATTEMPTS else "error"
         log.warning("[AssessOrchestrator] item %s %s (attempt %d): %s", item_id, status, data["attempts"], exc)
+        activity.emit("compare", f"assessment failed ({status}, attempt {data['attempts']}): {str(exc)[:120]}", "error",
+                      item=item_id)
         store.update_item(item_id, status=status, data=data, error=f"{exc.__class__.__name__}: {exc}"[:500])
         return {"status": status, "item_id": item_id, "error": str(exc)[:300]}
 

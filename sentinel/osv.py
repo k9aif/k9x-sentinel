@@ -151,10 +151,15 @@ def findings_for(name: str, info: Dict[str, Any], vulns: List[Dict[str, Any]], s
     }
 
 
-def audit(src: Dict[str, Any], timeout: float) -> List[Dict[str, Any]]:
+def audit(src: Dict[str, Any], timeout: float, on_package=None) -> List[Dict[str, Any]]:
+    """on_package(name, summary_or_None) is called after each package (live view)."""
     out = []
     for name, info in sorted(requirements(src.get("package", "k9-aif")).items()):
         item = findings_for(name, info, query(name, src["url"], timeout), src["id"])
         if item:
             out.append(item)
+        if on_package:
+            d = (item or {}).get("data") or {}
+            on_package(name, f"{info['spec']} allows {len(d['advisories'])} fixed advisories → {d['recommended']}"
+                       if item else None)
     return out
