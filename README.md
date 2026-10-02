@@ -79,7 +79,7 @@ A model call is the last resort:
 
 ## k9x-hil note (read before going live)
 
-Sentinel's queue (`hil.requests.framework_security_updates`) is registered only on the **internal** k9x-hil (`HIL_PROFILE=internal`, LAN :8096, never tunnelled), and that is where its cases are decided. The public hil.k9x.ai (example applications only, read-only for every login) doesn't register the topic, so it never receives them.
+Sentinel's queue (`hil.requests.framework_security_updates`) is registered only on the **internal** k9x-hil (`HIL_PROFILE=internal`, LAN :8096, never tunnelled), and that is where its cases are decided. The public hil.k9x.ai (example applications only) doesn't register the topic, so it never receives them.
 
 Within k9x-hil itself, two authorization gaps remain (they matter less with a single-admin internal instance):
 
