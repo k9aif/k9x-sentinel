@@ -79,7 +79,9 @@ A model call is the last resort:
 
 ## k9x-hil note (read before going live)
 
-As of this writing, k9x-hil (also served publicly at hil.k9x.ai with a demo login) has two authorization gaps that matter here:
+Sentinel's queue (`hil.requests.framework_security_updates`) is registered only on the **internal** k9x-hil (`HIL_PROFILE=internal`, LAN :8096, never tunnelled), and that is where its cases are decided. The public hil.k9x.ai doesn't register the topic, so it never receives them, and it is read-only anyway: no one can act there and it publishes nothing.
+
+Within k9x-hil itself, two authorization gaps remain (they matter less with a single-admin internal instance):
 
 1. Any logged-in user can list and open **every** task (`/tasks` isn't filtered by application membership). Sentinel therefore sends **minimal** cases by default (`SENTINEL_HIL_DETAIL=minimal`): finding number, verdict, severity and a link to Sentinel's login-protected UI.
 2. A decision's `actor` comes from the request body, not the login. Anyone logged in can decide **as anyone**. Sentinel acts only on decisions from `SENTINEL_HIL_APPROVERS` (others are ignored and the case is raised again), but that check is only as good as the actor k9x-hil records.
