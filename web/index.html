@@ -351,6 +351,7 @@ document.getElementById("runbtn").addEventListener("click", async () => {
   try {
     await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
     document.getElementById("console").innerHTML = ""; chipState = {}; srcCount = {}; itemSource = {};
+    reached = -1; nothingNew = false;
     showLive(true); pollLive();
     document.getElementById("live").scrollIntoView({behavior: "smooth", block: "start"});
   } catch (err) { document.getElementById("runstate").textContent = err.message; }
@@ -423,10 +424,20 @@ const STAGES = [["sources", "Sources", "feeds + OSV"], ["screen", "Screen", "Shi
 const STAGE_OF = {sources: "sources", osv: "sources", collect: "sources", screen: "screen", compare: "compare",
                   triage: "triage", hil: "review", decision: "review"};
 let liveSeq = 0, liveTimer = null, chipState = {}, SOURCES = [], srcCount = {}, itemSource = {}, srcFilter = null;
+let reached = -1, nothingNew = false;   // furthest stage this run got to (kept after it ends)
 const bump = (src, k) => { if (!src) return; srcCount[src] = srcCount[src] || {}; srcCount[src][k] = (srcCount[src][k] || 0) + 1; };
 function showLive(on) { document.getElementById("live").hidden = !on; }
 document.getElementById("livehide").addEventListener("click", () => showLive(false));
 function drawPipe(stage, sub, running) {
+  if (!running) {   // finished: show the path the last run took, not a grey strip
+    document.getElementById("pipe").innerHTML = STAGES.map((s, i) => {
+      const done = i <= reached;
+      const wire = i === 0 ? "" : `<div class="wire ${done ? "done" : ""}"></div>`;
+      const label = i === 1 && nothingNew && reached === 0 ? "nothing new to assess" : s[2];
+      return `${wire}<div class="node ${done ? "done" : ""}"><span class="k">${esc(s[1])}</span><span class="s">${esc(label)}</span></div>`;
+    }).join("");
+    return;
+  }
   const idx = STAGES.findIndex(s => s[0] === stage);
   document.getElementById("pipe").innerHTML = STAGES.map((s, i) => {
     const cls = !running ? (idx >= 0 ? "done" : "") : i < idx ? "done" : i === idx ? "active" : "";
@@ -465,6 +476,9 @@ async function pollLive() {
   let refresh = false;
   for (const e of d.events) {
     liveSeq = e.seq; logLine(e);
+    const si = STAGES.findIndex(s => s[0] === STAGE_OF[e.stage]);
+    if (si > reached) reached = si;
+    if (e.stage === "run" && /^0 item\(s\) to assess/.test(e.msg)) nothingNew = true;
     if (e.msg.startsWith("verdict:") || e.stage === "hil") refresh = true;
     if (e.source && (e.stage === "sources")) chipState[e.source] = e.level === "error" ? "error" : e.level === "ok" ? "ok" : "active";
     if (e.stage === "sources" && e.level === "ok" && e.new) { srcCount[e.source] = srcCount[e.source] || {}; srcCount[e.source].new = e.new; }
