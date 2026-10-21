@@ -55,6 +55,8 @@
   .note { border-left: 3px solid var(--warn); background: rgba(240,180,76,.07); padding: 10px 14px; border-radius: 0 8px 8px 0; color: #e9dcc0; font-size: 15px; }
   .back { display: inline-block; margin: 26px 0 0; }
   footer { text-align: center; color: #6f7690; font-size: 13px; padding: 24px 16px 40px; }
+.verline { max-width: 980px; margin: 10px auto 0; padding: 0 20px; font-size: 13px; color: var(--mute); }
+.verline b { color: inherit; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -63,6 +65,7 @@
   <h1>K9X Sentinel</h1>
   <p>An AI should not fall for another AI's attack. That is the goal of K9-AIF. Sentinel keeps the framework's defences moving as fast as the attacks: it reads the threat landscape every day, checks each new attack against what the framework already does, and puts the gaps in front of the people who decide.</p>
 </header>
+<div class="verline" id="verline" aria-label="Version"></div>
 <nav class="top">
   <a href="#what">What it is</a><a href="#does">What it does</a><a href="#current">Keeping K9-AIF current</a>
   <a href="#architect">For architects</a><a href="#setup">Set it up</a><a href="#limits">Limits</a><a href="/login">Open Sentinel →</a>
@@ -170,6 +173,12 @@ ubuntu/build-run.sh run     # run now instead of waiting for 06:00</pre>
 </section>
 </main>
 <script>
+fetch("/api/health").then(r => r.json()).then(h => {   // what is running, and what it judges against
+  const e = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  document.getElementById("verline").innerHTML =
+    `K9X Sentinel <b>${e(h.version)}</b> · build <b>${e(h.commit)}</b> · deployed ${e(h.built)}` +
+    (h.catalog_framework_version ? ` · judging against the <b>k9-aif ${e(h.catalog_framework_version)}</b> catalog (${e(h.catalog_controls)} controls)` : "");
+}).catch(() => {});
 fetch("/api/public").then(r => r.json()).then(p => {
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const kind = {rss: "RSS feed", atom: "Atom feed", cisa_kev: "CISA KEV (JSON)", osv: "OSV API"};

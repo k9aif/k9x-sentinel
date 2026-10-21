@@ -19,13 +19,19 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# What is running (About and /api/health): set by build-run.sh.
+ARG SENTINEL_COMMIT=unknown
+ARG SENTINEL_BUILT=unknown
 RUN mkdir -p /app/runtime /app/logs \
  && chown -R 1001:0 /app/runtime /app/logs && chmod -R g+rwX /app/runtime /app/logs
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     SENTINEL_DB_PATH=/app/runtime/sentinel.db \
-    SENTINEL_HIL_DB_PATH=/app/runtime/hil_pending.db
+    SENTINEL_HIL_DB_PATH=/app/runtime/hil_pending.db \
+    SENTINEL_COMMIT=$SENTINEL_COMMIT \
+    SENTINEL_BUILT=$SENTINEL_BUILT
 
 EXPOSE 8114
 

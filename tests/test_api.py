@@ -20,7 +20,9 @@ def client(monkeypatch):
 
 
 def test_health_is_open(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
+    h = client.get("/api/health").json()        # open, and says what is running and what it judges against
+    assert h["status"] == "ok" and h["version"] and h["commit"] and h["built"]
+    assert "catalog_framework_version" in h
 
 
 def test_everything_else_needs_the_login(client, monkeypatch):

@@ -132,6 +132,7 @@
  <div class="hrow">
   <img src="/logo.svg" alt="" width="30" height="34">
   <h1>K9X Sentinel</h1>
+  <span class="mute" id="appver" title="Version · build · deployed"></span>
   <span class="sub">threat watch for the K9-AIF framework</span>
   <span class="spacer"></span>
   <span id="runstate" class="mute"></span>
@@ -216,6 +217,12 @@ async function api(path, opts) {
   return r.json();
 }
 function card(k, v) { return `<div class="card"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`; }
+
+fetch("/api/health").then(r => r.json()).then(h => {
+  document.getElementById("appver").textContent = `v${h.version} · ${h.commit}`;
+  document.getElementById("appver").title = `Version ${h.version} · build ${h.commit} · deployed ${h.built}` +
+    (h.k9_aif_installed ? ` · k9-aif ${h.k9_aif_installed} installed` : "");
+}).catch(() => {});
 
 async function loadStatus() {
   const editing = document.activeElement && ["schedtime", "schedon"].includes(document.activeElement.id);

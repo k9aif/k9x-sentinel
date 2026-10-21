@@ -32,7 +32,11 @@ case "$cmd" in
   build)
     echo "Building $IMAGE (context: $PROJECT_DIR) ..."
     cd "$PROJECT_DIR"
-    sudo podman build -t "$IMAGE" -f ubuntu/Containerfile .
+    COMMIT=$(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
+    BUILT=$(date +%Y-%m-%d)
+    sudo podman build -t "$IMAGE" -f ubuntu/Containerfile \
+      --build-arg SENTINEL_COMMIT="$COMMIT" --build-arg SENTINEL_BUILT="$BUILT" .
+    echo "Version $(cat "$PROJECT_DIR/VERSION" 2>/dev/null || echo dev) · build $COMMIT · $BUILT"
     echo "Build complete: $IMAGE"
     ;;
 

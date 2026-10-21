@@ -124,7 +124,21 @@ async def _startup() -> None:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    """Public: what is running, and which framework catalog the verdicts are judged against."""
+    from sentinel.settings import build_info
+    out = {"status": "ok", **build_info()}
+    try:
+        cat = catalog.load()
+        out["catalog_framework_version"] = cat.get("framework_version")
+        out["catalog_controls"] = len(cat.get("capabilities") or [])
+    except Exception as exc:          # the health answer must not fail because the catalog did
+        out["catalog_error"] = f"{exc.__class__.__name__}"
+    try:
+        from importlib.metadata import version as _v
+        out["k9_aif_installed"] = _v("k9-aif")
+    except Exception:
+        out["k9_aif_installed"] = None
+    return out
 
 
 @app.get("/api/status")

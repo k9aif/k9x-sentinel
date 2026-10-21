@@ -204,3 +204,19 @@ def severity_at_least(value: str, floor: str) -> bool:
 
 def sources(cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
     return list(cfg.get("sentinel", {}).get("sources", []))
+
+
+def build_info() -> Dict[str, str]:
+    """What is running: VERSION from the repo; the commit and build date baked into the image by build-run.sh
+    (SENTINEL_COMMIT / SENTINEL_BUILT), or read from git when running from a checkout."""
+    import subprocess
+    version = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "dev"
+    commit = os.environ.get("SENTINEL_COMMIT", "").strip()
+    built = os.environ.get("SENTINEL_BUILT", "").strip()
+    if not commit:
+        try:
+            commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True,
+                                    text=True, timeout=3).stdout.strip()
+        except Exception:
+            commit = ""
+    return {"version": version, "commit": commit or "unknown", "built": built or "local run"}
