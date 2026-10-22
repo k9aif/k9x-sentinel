@@ -109,7 +109,7 @@ security:
     ingress:
       checks: [InputSizeCheck, PromptInjectionCheck, SemanticDriftCheck]
     egress:
-      checks: [OutputSanitizationCheck]
+      checks: [OutputSanitizationCheck, PIIBoundaryCheck]   # PII: flagged (strict: false), never blocks
     check_config:
       InputSizeCheck:
         max_chars: 60000
