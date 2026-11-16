@@ -111,7 +111,7 @@
   <!-- ── Framework lane ── -->
   <rect class="box" x="562" y="420" width="176" height="84" fill="#ffffff" stroke="#7d5ba6"/>
   <text class="t" x="574" y="440">capabilities.yaml</text>
-  <text class="l" x="574" y="458">25 controls mapped to</text>
+  <text class="l" x="574" y="458">every control, mapped to</text>
   <text class="l" x="574" y="474">OWASP LLM01–10 · ASI01–10,</text>
   <text class="l" x="574" y="490">plus known gaps</text>
 

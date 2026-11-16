@@ -399,6 +399,12 @@ def architecture():
     return FileResponse(WEB / "architecture.svg", media_type="image/svg+xml")
 
 
+@app.get("/architecture-grey.svg")
+def architecture_grey():
+    """The same architecture in shades of grey for the landing page (each lane keeps a hint of its colour)."""
+    return FileResponse(WEB / "architecture-grey.svg", media_type="image/svg+xml")
+
+
 @app.get("/sentinel-watch.jpg")
 def watch_image():
     """The landing page's hero image (public, like the logo)."""
