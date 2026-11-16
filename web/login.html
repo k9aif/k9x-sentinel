@@ -3,125 +3,289 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>K9X Sentinel — Sign in</title>
+<title>K9X Sentinel · the night watch for K9-AIF</title>
+<meta name="description" content="K9X Sentinel reads new attacks on AI agents every morning, checks each against what K9-AIF already defends, and asks a person only about the gaps.">
 <link rel="icon" href="/logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; --violet:#a855f7; --cyan:#38bdf8; --ink:#e7e9f3; --mute:#9aa1b8; }
+  /* Night watch: a midnight sky, a watch light that sweeps it, and what it finds marked by verdict. */
+  :root {
+    color-scheme: dark;
+    --sky:#050a14; --sky-2:#0a1324; --panel:rgba(14,24,44,.72); --line:rgba(140,170,220,.16);
+    --ink:#e6ecf7; --mute:#93a2bd; --dim:#5f6f8c;
+    --beam:#bfe3ff; --watch:#7cc4ff;                       /* the watch light */
+    --covered:#34d399; --partial:#fbbf24; --gap:#f87171;   /* verdicts */
+    --head:"Saira Condensed", "Arial Narrow", system-ui, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: #05060c; color: var(--ink); overflow-x: hidden;
-         font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  canvas#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
-  .floor { position: fixed; left: 0; right: 0; bottom: 0; height: 38vh; z-index: 0; pointer-events: none;
-           background-image: linear-gradient(rgba(120,140,255,.10) 1px, transparent 1px),
-                             linear-gradient(90deg, rgba(120,140,255,.10) 1px, transparent 1px);
-           background-size: 56px 56px; transform: perspective(420px) rotateX(62deg); transform-origin: bottom;
-           mask-image: linear-gradient(to top, rgba(0,0,0,.9), transparent); -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.9), transparent); }
-  main { position: relative; z-index: 1; min-height: 100%; width: 100%; display: flex; flex-direction: column;
-         align-items: center; justify-content: center; padding: 32px 16px 40px; }
-  .logo { width: 56px; height: auto; filter: drop-shadow(0 0 18px rgba(168,85,247,.55)); }
-  h1 { margin: 6px 0 0; font: 800 clamp(26px, 7vw, 42px)/1.05 Orbitron, "Segoe UI", system-ui, sans-serif;
-       letter-spacing: .02em; text-align: center;
-       background: linear-gradient(90deg, #9b5cf6 0%, #c4a1ff 45%, #7dd3fc 72%, #38bdf8 100%);
-       -webkit-background-clip: text; background-clip: text; color: transparent;
-       filter: drop-shadow(0 0 22px rgba(124,92,255,.35)); }
-  .tag { display: flex; align-items: center; gap: 10px; margin: 8px 0 22px; color: #b9bfd3;
-         font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; text-align: center; }
-  .tag::before, .tag::after { content: ""; width: clamp(20px, 6vw, 48px); height: 1px; border-radius: 2px; }
-  main > * { max-width: 100%; }
-  @media (max-width: 520px) { .tag::before, .tag::after { display: none; } .tag { font-size: 14px; letter-spacing: .03em; }
-                              .card h2 { letter-spacing: .18em; font-size: 13px; } }
-  .tag::before { background: linear-gradient(90deg, transparent, var(--violet)); box-shadow: 0 0 8px var(--violet); }
-  .tag::after { background: linear-gradient(90deg, var(--cyan), transparent); box-shadow: 0 0 8px var(--cyan); }
-  .card { width: min(380px, 100%); padding: 26px 28px 20px; border-radius: 12px;
-          background: linear-gradient(180deg, rgba(28,26,44,.72), rgba(14,14,24,.78));
-          border: 1px solid rgba(160,150,220,.22); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          box-shadow: 0 24px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05); }
-  .card h2 { margin: 0; text-align: center; font: 500 11.5px/1 Inter, system-ui, sans-serif; letter-spacing: .32em; color: #e9e6f7; }
-  .rule { position: relative; height: 1px; margin: 14px 0 18px;
-          background: linear-gradient(90deg, transparent, rgba(168,85,247,.6), transparent); }
-  .rule::after { content: ""; position: absolute; left: 50%; top: -3px; width: 7px; height: 7px; margin-left: -3.5px;
-                 border-radius: 50%; background: var(--violet); box-shadow: 0 0 10px var(--violet); }
-  label { display: block; margin: 0 0 6px; font-size: 11px; letter-spacing: .14em; color: var(--mute); text-transform: uppercase; }
-  .field { position: relative; margin-bottom: 14px; }
-  .field svg.ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: #a7adc2; }
-  input { width: 100%; height: 40px; padding: 0 40px 0 38px; border-radius: 7px; font-size: 14px; font: inherit; color: var(--ink);
-          background: rgba(8,9,16,.7); border: 1px solid rgba(160,170,210,.18); outline: none; transition: border-color .15s, box-shadow .15s; }
-  input::placeholder { color: #6f7690; }
-  input:focus { border-color: rgba(168,85,247,.7); box-shadow: 0 0 0 3px rgba(168,85,247,.18); }
-  .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px;
-         display: grid; place-items: center; border: 0; background: none; color: #a7adc2; cursor: pointer; border-radius: 8px; }
-  .eye:hover { color: #fff; } .eye:focus-visible { outline: 2px solid var(--violet); }
-  .eye svg { width: 18px; height: 18px; }
-  button.go { width: 100%; height: 42px; margin-top: 4px; border: 0; border-radius: 7px; cursor: pointer;
-              display: flex; align-items: center; justify-content: center; gap: 8px; font: 600 14.5px Inter, system-ui, sans-serif; color: #fff;
-              background: linear-gradient(90deg, #7c3aed, #9b5cf6 55%, #7c3aed);
-              box-shadow: 0 0 24px rgba(139,92,246,.45), inset 0 1px 0 rgba(255,255,255,.25); transition: filter .15s, transform .05s; }
-  button.go:hover { filter: brightness(1.1); } button.go:active { transform: translateY(1px); }
-  button.go:disabled { filter: grayscale(.4) brightness(.8); cursor: default; }
-  button.go svg { width: 17px; height: 17px; }
-  .err { min-height: 18px; margin: 10px 0 0; text-align: center; color: #fca5a5; font-size: 13px; }
-  .demo { margin: 0 0 10px; padding: 7px 10px; text-align: center; font-size: 12.5px; color: #d8dbe8;
-          border: 1px dashed rgba(160,150,220,.35); border-radius: 7px; background: rgba(124,92,255,.08); }
-  .demo b { color: #fff; font-weight: 600; }
-  .foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; color: var(--mute); font-size: 11.5px; text-align: center; }
-  .foot svg { width: 12px; height: 12px; flex: none; }
-  .meta { margin-top: 18px; color: #5d6378; font-size: 11px; text-align: center; }
-  .meta a { color: #8b93ad; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; color: var(--ink); background: var(--sky); overflow-x: hidden;
+         font: 15px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+    background: radial-gradient(1200px 700px at 78% 18%, rgba(70,110,190,.20), transparent 60%),
+                radial-gradient(900px 600px at 10% 90%, rgba(40,80,150,.14), transparent 60%),
+                linear-gradient(180deg, #050a14 0%, #071021 55%, #050a14 100%); }
+  canvas#stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  a { color: var(--watch); }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
+
+  /* Top bar: brand, sections, and a small sign-in */
+  .top { position: sticky; top: 0; z-index: 20; background: rgba(5,10,20,.82); backdrop-filter: blur(12px);
+         -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .top .wrap { display: flex; align-items: center; gap: 18px; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); flex: none; }
+  .brand img { width: 28px; height: auto; }
+  .brand b { font: 700 19px/1 var(--head); letter-spacing: .14em; }
+  nav.sections { display: flex; gap: 18px; flex: 1; }
+  nav.sections a { color: var(--mute); text-decoration: none; font-size: 13.5px; }
+  nav.sections a:hover { color: var(--ink); }
+  form#signin { display: flex; align-items: center; gap: 6px; flex: none; }
+  form#signin input { width: 132px; height: 30px; padding: 0 9px; border-radius: 6px; font: 13px Inter, system-ui, sans-serif;
+                      color: var(--ink); background: rgba(10,18,34,.9); border: 1px solid var(--line); outline: none; }
+  form#signin input::placeholder { color: var(--dim); }
+  form#signin input:focus { border-color: var(--watch); box-shadow: 0 0 0 3px rgba(124,196,255,.15); }
+  form#signin button { height: 30px; padding: 0 12px; border: 0; border-radius: 6px; cursor: pointer;
+                       font: 600 13px Inter, system-ui, sans-serif; color: #04121f; background: var(--watch); }
+  form#signin button:hover { background: var(--beam); }
+  form#signin button:disabled { opacity: .6; cursor: default; }
+  .err { position: absolute; right: 22px; top: 60px; max-width: 320px; padding: 6px 10px; border-radius: 6px; font-size: 12.5px;
+         color: #fecaca; background: rgba(60,12,16,.92); border: 1px solid rgba(248,113,113,.35); }
+  .err:empty { display: none; }
+  .signin-toggle { display: none; height: 30px; padding: 0 12px; border-radius: 6px; cursor: pointer; margin-left: auto;
+                   font: 600 13px Inter, system-ui, sans-serif; color: #04121f; background: var(--watch); border: 0; }
+  @media (max-width: 980px) {
+    nav.sections { display: none; }
+    .signin-toggle { display: block; }
+    form#signin { display: none; position: absolute; right: 16px; top: 64px; flex-direction: column; align-items: stretch;
+                  width: min(280px, calc(100vw - 32px)); padding: 14px; border-radius: 10px; background: #0b1528;
+                  border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0,0,0,.5); }
+    form#signin.open { display: flex; }
+    form#signin input { width: 100%; height: 36px; }
+    form#signin button { height: 36px; }
+    .err { top: auto; position: static; margin-top: 4px; max-width: none; }
+  }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 36px; align-items: center; padding: 64px 0 40px; }
+  .eyebrow { font: 500 12px var(--mono); letter-spacing: .18em; color: var(--watch); text-transform: uppercase; }
+  .eyebrow .dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%;
+                  background: var(--covered); box-shadow: 0 0 10px var(--covered); vertical-align: 1px; animation: pulse 2.4s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  h1 { margin: 14px 0 8px; font: 800 clamp(44px, 7vw, 76px)/.95 var(--head); letter-spacing: .02em; }
+  h1 span { color: var(--watch); }
+  .sub { margin: 0 0 18px; font: 600 clamp(20px, 2.6vw, 26px)/1.2 var(--head); letter-spacing: .03em; color: var(--beam); }
+  .lede { margin: 0 0 26px; max-width: 560px; color: var(--mute); font-size: 16.5px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 8px; cursor: pointer;
+         font: 600 14.5px Inter, system-ui, sans-serif; text-decoration: none; border: 1px solid transparent; }
+  .btn.primary { color: #04121f; background: var(--watch); box-shadow: 0 0 28px rgba(124,196,255,.35); }
+  .btn.primary:hover { background: var(--beam); }
+  .btn.ghost { color: var(--ink); background: transparent; border-color: rgba(147,162,189,.35); }
+  .btn.ghost:hover { border-color: var(--watch); }
+  .demo-note { margin-top: 12px; font-size: 13px; color: var(--dim); }
+  .demo-note code { font: 12.5px var(--mono); color: var(--mute); }
+  .live { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line);
+          font: 500 12.5px var(--mono); color: var(--mute); }
+  .live b { color: var(--ink); font-weight: 500; }
+
+  .scope { position: relative; aspect-ratio: 1; width: 100%; max-width: 480px; justify-self: center; }
+  canvas#scope { width: 100%; height: 100%; display: block; }
+  .legend { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font: 500 12px var(--mono); color: var(--mute); }
+  .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; vertical-align: -1px; }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  .label { font: 500 12px var(--mono); letter-spacing: .2em; color: var(--watch); text-transform: uppercase; }
+  h2 { margin: 8px 0 10px; font: 700 clamp(28px, 4vw, 38px)/1.1 var(--head); letter-spacing: .02em; }
+  .intro { margin: 0 0 26px; max-width: 720px; color: var(--mute); }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .card { padding: 20px 20px 18px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+  .card h3 { margin: 0 0 6px; font: 700 20px/1.2 var(--head); letter-spacing: .03em; }
+  .card p { margin: 0; color: var(--mute); font-size: 14px; }
+  .card .k { font: 500 11.5px var(--mono); color: var(--watch); letter-spacing: .12em; text-transform: uppercase; }
+
+  .sources { display: flex; flex-wrap: wrap; gap: 8px; }
+  .src { padding: 7px 12px; border-radius: 999px; font-size: 13px; color: var(--ink); background: rgba(14,24,44,.8);
+         border: 1px solid var(--line); }
+  .src small { color: var(--dim); font: 500 11px var(--mono); margin-left: 6px; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; counter-reset: s; }
+  .step { position: relative; padding: 18px 18px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+  .step::before { counter-increment: s; content: "0" counter(s); display: block; margin-bottom: 8px;
+                  font: 700 28px/1 var(--head); color: var(--watch); }
+  .step h3 { margin: 0 0 6px; font: 700 18px/1.2 var(--head); letter-spacing: .03em; }
+  .step p { margin: 0; color: var(--mute); font-size: 14px; }
+  .verdicts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .v { font: 500 11.5px var(--mono); padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+  .v.c { color: var(--covered); border-color: rgba(52,211,153,.4); }
+  .v.p { color: var(--partial); border-color: rgba(251,191,36,.4); }
+  .v.g { color: var(--gap); border-color: rgba(248,113,113,.4); }
+
+  .arch { padding: 14px; border-radius: 12px; background: #f6f8fc; border: 1px solid var(--line); }
+  .arch img { display: block; width: 100%; height: auto; }
+
+  .built { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; align-items: start; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip { padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--ink); text-decoration: none;
+          background: rgba(14,24,44,.8); border: 1px solid var(--line); }
+  .chip:hover { border-color: var(--watch); }
+
+  footer { padding: 26px 0 40px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12.5px; }
+  footer a { color: var(--mute); }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; padding-top: 40px; }
+    .scope { max-width: 340px; }
+    .grid, .built { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 520px) { .steps { grid-template-columns: 1fr; } .wrap { padding: 0 16px; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .eyebrow .dot { animation: none; } }
 </style>
 </head>
 <body>
-<canvas id="bg" aria-hidden="true"></canvas>
-<div class="floor" aria-hidden="true"></div>
-<main>
-  <img class="logo" src="/logo.svg" alt="">
-  <h1>K9X Sentinel</h1>
-  <div class="tag">Threat watch for the K9-AIF framework</div>
+<canvas id="stars" aria-hidden="true"></canvas>
 
-  <form class="card" id="f" autocomplete="on" novalidate>
-    <h2>SIGN IN TO K9X SENTINEL</h2>
-    <div class="rule"></div>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="/logo.svg" alt=""><b>K9X SENTINEL</b></a>
+    <nav class="sections" aria-label="Sections">
+      <a href="#watch">What it watches</a>
+      <a href="#how">How it works</a>
+      <a href="#architecture">Architecture</a>
+      <a href="/about">About</a>
+    </nav>
+    <button class="signin-toggle" id="toggle" type="button" aria-expanded="false" aria-controls="signin">Sign in</button>
+    <form id="signin" autocomplete="on" novalidate aria-label="Sign in to K9X Sentinel">
+      <input id="u" name="username" autocomplete="username" placeholder="Username" aria-label="Username" required>
+      <input id="p" name="password" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+      <button type="submit" id="go">Sign in</button>
+      <p class="err" id="err" role="alert"></p>
+    </form>
+  </div>
+</header>
 
-    <label for="u">Email / Username</label>
-    <div class="field">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-      <input id="u" name="username" autocomplete="username" placeholder="Enter your email or username" required autofocus>
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <div class="eyebrow"><span class="dot"></span>On watch for K9-AIF · every morning, 06:00</div>
+      <h1>K9X <span>Sentinel</span></h1>
+      <p class="sub">The night watch for K9-AIF's defences.</p>
+      <p class="lede">New attacks on AI agents appear every day. Sentinel <b>reads them each morning</b>, checks every one
+        against what K9-AIF already defends, and <b>wakes a person only for the gaps</b>. It never changes code:
+        a person decides, and an approved gap becomes a private draft advisory for the maintainers.</p>
+      <div class="cta">
+        <button class="btn primary" id="demo" type="button" hidden>Try the demo →</button>
+        <a class="btn ghost" href="/about">Read the full story</a>
+      </div>
+      <div class="demo-note" id="demonote" hidden>Demo (read-only): <code id="demou"></code> / <code id="demop"></code> ·
+        open gaps stay under private review</div>
+      <div class="live" id="live">
+        <span>Judged against <b id="lv-cat">the k9-aif capability catalog</b></span>
+        <span id="lv-ctl-wrap" hidden><b id="lv-ctl"></b> controls</span>
+        <span id="lv-src-wrap" hidden><b id="lv-src"></b> sources on watch</span>
+      </div>
     </div>
-
-    <label for="p">Password</label>
-    <div class="field">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor"/></svg>
-      <input id="p" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-      <button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
+    <div>
+      <div class="scope"><canvas id="scope" aria-label="A watch light sweeping for new threats; each one is marked covered, partial or gap"></canvas></div>
+      <div class="legend"><span><i style="background:var(--covered)"></i>covered</span><span><i style="background:var(--partial)"></i>partial</span><span><i style="background:var(--gap)"></i>gap</span></div>
     </div>
+  </div>
 
-    <button class="go" type="submit" id="go">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
-      <span>Sign in</span>
-    </button>
-    <p class="err" id="err" role="alert"></p>
-    <div class="demo" id="demo" hidden>Demo (read-only): <b id="demou"></b> / <b id="demop"></b></div>
-    <div class="foot">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
-      Secure access to K9-AIF threat intelligence
+  <section id="watch">
+    <div class="wrap">
+      <div class="label">What it watches</div>
+      <h2>Two tracks, read every morning</h2>
+      <p class="intro">Techniques are judged by a local model against the catalog. Dependencies need no model: if the
+        lowest version k9-aif allows has a known, fixed vulnerability, Sentinel says which floor to raise.</p>
+      <div class="grid">
+        <div class="card"><div class="k">Technique track</div><h3>Threat research</h3>
+          <p>New attack write-ups, OWASP and MITRE ATLAS releases, and agent-security researchers. Article text is
+            treated as untrusted: the model has no tools, and its answer is checked against the catalog.</p></div>
+        <div class="card"><div class="k">Dependency track</div><h3>OSV advisories</h3>
+          <p>Every package k9-aif declares. A deterministic check, no model: is the allowed floor affected by an
+            advisory that has a fix?</p></div>
+        <div class="card"><div class="k">The yardstick</div><h3>The capability catalog</h3>
+          <p>The list of every K9-AIF control, mapped to the OWASP Top 10s for LLM and agentic applications. It ships
+            with the framework, so each verdict is judged against the version you run.</p></div>
+      </div>
+      <p class="intro" style="margin:22px 0 10px">The sources on watch today:</p>
+      <div class="sources" id="sources"><span class="src">loading…</span></div>
     </div>
-  </form>
-  <div class="meta">Private instance · findings describe gaps that may not be fixed yet · <a href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener noreferrer">k9aif/k9x-sentinel</a></div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="label">How it works</div>
+      <h2>From a new attack to a closed gap</h2>
+      <div class="steps">
+        <div class="step"><h3>Read</h3><p>Only new items, from public URLs. k9x Shield labels injection text in an
+          article; it never hides it, or Sentinel would be blind to the attack it is reading about.</p></div>
+        <div class="step"><h3>Judge</h3><p>Each threat is compared with the catalog and given a verdict.</p>
+          <div class="verdicts"><span class="v c">covered</span><span class="v p">partial</span><span class="v g">gap</span></div></div>
+        <div class="step"><h3>Wake a person</h3><p>Only gaps and partial gaps of at least medium severity go to a
+          reviewer in K9X HIL. Everything else is recorded and visible here.</p></div>
+        <div class="step"><h3>Close it</h3><p>An approval becomes a private draft advisory or an issue. The maintainers
+          ship the fix and update the catalog in the same commit.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="wrap">
+      <div class="label">Architecture</div>
+      <h2>Sources, Sentinel, the framework, people</h2>
+      <p class="intro">Sentinel is itself a K9-AIF application: Router, Orchestrators, Squads and Agents, governed by
+        k9x Shield and Granite Guardian, with human review through the framework's own HIL path.</p>
+      <div class="arch"><img src="/architecture.svg" alt="K9X Sentinel architecture as horizontal lanes: sources, the Sentinel pipeline, the K9-AIF framework, people and GitHub"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap built">
+      <div>
+        <div class="label">Rules of the watch</div>
+        <h2>Advisory, never autonomous</h2>
+        <div class="grid" style="grid-template-columns:1fr;gap:12px">
+          <div class="card"><h3>A person decides</h3><p>Sentinel finds and explains. It never changes code.</p></div>
+          <div class="card"><h3>Private by design</h3><p>A gap is an unpatched weakness in a public framework. Details
+            stay behind sign-in; the demo shows open gaps as "under private review", and gaps go to draft advisories.</p></div>
+          <div class="card"><h3>It uses what it protects</h3><p>Built on K9-AIF and governed by it, so every safeguard
+            Sentinel checks for is one it runs under.</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="k">Part of the K9X ecosystem</div>
+        <h3>Built on K9-AIF</h3>
+        <p>Sentinel keeps the framework's defences current. K9X SATAN attacks them to prove they hold, and K9X HIL is
+          where its reviewers decide.</p>
+        <div class="chips">
+          <a class="chip" href="https://k9x.ai" target="_blank" rel="noopener">k9x.ai ↗</a>
+          <a class="chip" href="https://hil.k9x.ai" target="_blank" rel="noopener">K9X HIL ↗</a>
+          <a class="chip" href="https://satan.k9x.ai" target="_blank" rel="noopener">K9X SATAN ↗</a>
+          <a class="chip" href="https://dashboard.k9x.ai" target="_blank" rel="noopener">Dashboard ↗</a>
+          <a class="chip" href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener">Source ↗</a>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
+<footer>
+  <div class="wrap">Private instance · findings describe gaps that may not be fixed yet ·
+    <a href="/about">About</a> · <a href="https://github.com/k9aif/k9x-sentinel" target="_blank" rel="noopener noreferrer">k9aif/k9x-sentinel</a> ·
+    <a href="https://k9x.ai" target="_blank" rel="noopener">k9x.ai</a></div>
+</footer>
+
 <script>
-// Sign in
-const f = document.getElementById("f"), err = document.getElementById("err"), go = document.getElementById("go");
-f.addEventListener("submit", async e => {
-  e.preventDefault();
+// ── Sign in (top bar), and the demo button ────────────────────────────────
+const f = document.getElementById("signin"), err = document.getElementById("err"), go = document.getElementById("go");
+async function signIn(username, password) {
   err.textContent = "";
-  const username = f.username.value.trim(), password = f.password.value;
   if (!username || !password) { err.textContent = "Enter your username and password."; return; }
   go.disabled = true;
   try {
@@ -130,60 +294,128 @@ f.addEventListener("submit", async e => {
     if (r.ok) { location.replace("/" + location.hash); return; }
     const body = await r.json().catch(() => ({}));
     err.textContent = body.detail || `Sign-in failed (${r.status}).`;
+    f.classList.add("open");
     f.password.select();
-  } catch (_) { err.textContent = "Can't reach Sentinel. Is the server running?"; }
+  } catch (_) { err.textContent = "Can't reach Sentinel. Is the server running?"; f.classList.add("open"); }
   go.disabled = false;
-});
-fetch("/api/public").then(r => r.json()).then(p => {
-  if (!p.demo) return;
-  document.getElementById("demou").textContent = p.demo.user;
-  document.getElementById("demop").textContent = p.demo.password;
-  document.getElementById("demo").hidden = false;
-}).catch(() => {});
-const eye = document.getElementById("eye");
-eye.addEventListener("click", () => {
-  const show = f.password.type === "password";
-  f.password.type = show ? "text" : "password";
-  eye.setAttribute("aria-pressed", String(show));
-  eye.setAttribute("aria-label", show ? "Hide password" : "Show password");
+}
+f.addEventListener("submit", e => { e.preventDefault(); signIn(f.username.value.trim(), f.password.value); });
+const toggle = document.getElementById("toggle");
+toggle.addEventListener("click", () => {
+  const open = f.classList.toggle("open");
+  toggle.setAttribute("aria-expanded", String(open));
+  if (open) f.username.focus();
 });
 
-// Background: two particle waves, violet on the left, cyan on the right
+fetch("/api/public").then(r => r.json()).then(p => {
+  if (p.demo) {
+    document.getElementById("demou").textContent = p.demo.user;
+    document.getElementById("demop").textContent = p.demo.password;
+    document.getElementById("demonote").hidden = false;
+    const d = document.getElementById("demo");
+    d.hidden = false;
+    d.addEventListener("click", () => signIn(p.demo.user, p.demo.password));
+  }
+  const srcs = p.sources || [];
+  const box = document.getElementById("sources");
+  box.textContent = "";
+  for (const s of srcs) {
+    const el = document.createElement("span"); el.className = "src";
+    el.textContent = s.name;
+    const k = document.createElement("small"); k.textContent = s.kind; el.appendChild(k);
+    box.appendChild(el);
+  }
+  if (!srcs.length) box.innerHTML = '<span class="src">see the About page</span>';
+  else { document.getElementById("lv-src").textContent = srcs.length; document.getElementById("lv-src-wrap").hidden = false; }
+}).catch(() => {});
+
+fetch("/api/health").then(r => r.json()).then(h => {
+  if (h.catalog_framework_version) document.getElementById("lv-cat").textContent = `the k9-aif ${h.catalog_framework_version} catalog`;
+  if (h.catalog_controls) { document.getElementById("lv-ctl").textContent = h.catalog_controls; document.getElementById("lv-ctl-wrap").hidden = false; }
+}).catch(() => {});
+
+// ── Background: a still, faint starfield ──────────────────────────────────
 (() => {
-  const c = document.getElementById("bg"), x = c.getContext("2d");
+  const c = document.getElementById("stars"), x = c.getContext("2d");
+  function draw() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 170; i++) {
+      x.fillStyle = `rgba(190,215,255,${(0.08 + rnd() * 0.35).toFixed(2)})`;
+      const s = (0.5 + rnd() * 1.1) * dpr;
+      x.fillRect(rnd() * c.width, rnd() * c.height * 0.85, s, s);
+    }
+  }
+  draw(); addEventListener("resize", draw);
+})();
+
+// ── The watch: a light sweeps the scope; threats appear and take their verdict as it passes ──
+(() => {
+  const c = document.getElementById("scope"), x = c.getContext("2d");
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let w, h, dpr;
-  function size() { dpr = Math.min(devicePixelRatio || 1, 2); w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr; }
+  const COL = {covered: "52,211,153", partial: "251,191,36", gap: "248,113,113"};
+  const pick = () => { const r = Math.random(); return r < 0.62 ? "covered" : r < 0.88 ? "partial" : "gap"; };
+  let W, R, dpr;
+  function size() { dpr = Math.min(devicePixelRatio || 1, 2); const b = c.getBoundingClientRect();
+                    W = c.width = c.height = Math.round(b.width * dpr); R = W / 2; }
   size(); addEventListener("resize", size);
-  const stars = Array.from({length: 140}, () => [Math.random(), Math.random(), Math.random()]);
-  function wave(t, side) {
-    const left = side < 0, rgb = left ? "168,85,247" : "56,189,248";
-    for (let band = 0; band < 26; band++) {
-      for (let i = 0; i <= 70; i++) {
-        const u = i / 70;
-        const px = left ? u * w * 0.36 : w - u * w * 0.36;
-        const amp = h * (0.05 + band * 0.006);
-        const py = h * (left ? 0.36 : 0.30) + band * h * 0.011 + Math.sin(u * 5.2 + t * 0.6 + band * 0.32) * amp * (1 - u * 0.6) + (left ? u : u * 0.6) * h * 0.22;
-        const a = (1 - u) * (0.08 + 0.6 * Math.max(0, Math.sin(u * 9 + band + t))) * 0.55;
-        x.fillStyle = `rgba(${rgb},${a.toFixed(3)})`;
-        x.fillRect(px, py, 1.6 * dpr, 1.6 * dpr);
+  // threats: angle, distance (0..1), verdict, when first seen by the light
+  const blips = [];
+  function spawn(now) {
+    blips.push({a: Math.random() * Math.PI * 2, d: 0.22 + Math.random() * 0.72, v: pick(), seen: null, born: now});
+  }
+  for (let i = 0; i < 9; i++) spawn(-1e9);
+  const SPEED = 0.55;                            // radians per second: an unhurried watch
+  let last = 0, nextSpawn = 0;
+  function frame(ms) {
+    const t = ms / 1000, sweep = (t * SPEED) % (Math.PI * 2);
+    x.clearRect(0, 0, W, W);
+    x.save(); x.translate(R, R);
+    // scope face
+    const face = x.createRadialGradient(0, 0, 0, 0, 0, R);
+    face.addColorStop(0, "rgba(20,40,70,.55)"); face.addColorStop(1, "rgba(8,16,30,.85)");
+    x.fillStyle = face; x.beginPath(); x.arc(0, 0, R * 0.98, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = "rgba(140,180,240,.14)"; x.lineWidth = 1 * dpr;
+    for (const k of [0.25, 0.5, 0.75, 0.98]) { x.beginPath(); x.arc(0, 0, R * k, 0, Math.PI * 2); x.stroke(); }
+    x.beginPath(); x.moveTo(-R * .98, 0); x.lineTo(R * .98, 0); x.moveTo(0, -R * .98); x.lineTo(0, R * .98); x.stroke();
+    // the beam: a soft wedge trailing the leading edge
+    for (let i = 0; i < 26; i++) {
+      const a0 = sweep - (i + 1) * 0.035, a1 = sweep - i * 0.035;
+      x.fillStyle = `rgba(191,227,255,${(0.16 * (1 - i / 26)).toFixed(3)})`;
+      x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R * 0.98, a0, a1); x.closePath(); x.fill();
+    }
+    x.strokeStyle = "rgba(220,240,255,.75)"; x.lineWidth = 1.4 * dpr;
+    x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(sweep) * R * .98, Math.sin(sweep) * R * .98); x.stroke();
+    // threats
+    for (const b of blips) {
+      const diff = ((sweep - b.a) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      if (b.seen === null && diff < 0.08 && t - b.born / 1000 > 0.05) b.seen = t;
+      const px = Math.cos(b.a) * b.d * R * .96, py = Math.sin(b.a) * b.d * R * .96;
+      if (b.seen === null) {                       // not yet judged: a faint unknown
+        x.fillStyle = "rgba(200,215,240,.30)";
+        x.beginPath(); x.arc(px, py, 2.2 * dpr, 0, Math.PI * 2); x.fill();
+      } else {
+        const age = t - b.seen, a = Math.max(0, 1 - age / 9);
+        const rgb = COL[b.v];
+        x.fillStyle = `rgba(${rgb},${(0.95 * a).toFixed(3)})`;
+        x.beginPath(); x.arc(px, py, (b.v === "gap" ? 4.2 : 3.4) * dpr, 0, Math.PI * 2); x.fill();
+        if (age < 1.6) {                           // the moment of judgement: a ring opens
+          x.strokeStyle = `rgba(${rgb},${(0.7 * (1 - age / 1.6)).toFixed(3)})`; x.lineWidth = 1.2 * dpr;
+          x.beginPath(); x.arc(px, py, (4 + age * 14) * dpr, 0, Math.PI * 2); x.stroke();
+        }
       }
     }
-  }
-  function frame(ms) {
-    const t = ms / 1000;
-    x.clearRect(0, 0, w, h);
-    const g = x.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.max(w, h) * 0.7);
-    g.addColorStop(0, "rgba(40,30,80,.35)"); g.addColorStop(1, "rgba(5,6,12,0)");
-    x.fillStyle = g; x.fillRect(0, 0, w, h);
-    for (const [sx, sy, sz] of stars) {
-      x.fillStyle = `rgba(${sx < .5 ? "190,160,255" : "150,210,255"},${0.15 + 0.35 * Math.abs(Math.sin(t * 0.7 + sz * 9))})`;
-      x.fillRect(sx * w, sy * h, (0.6 + sz) * dpr, (0.6 + sz) * dpr);
-    }
-    wave(t, -1); wave(t, 1);
+    x.restore();
+    for (let i = blips.length - 1; i >= 0; i--) if (blips[i].seen !== null && t - blips[i].seen > 9) blips.splice(i, 1);
+    if (t > nextSpawn) { spawn(ms); nextSpawn = t + 0.9 + Math.random() * 1.4; }
+    last = t;
     if (!still) requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  if (still) {                                     // reduced motion: one judged, still frame
+    for (const b of blips) b.seen = 0;
+    frame(400);
+  } else requestAnimationFrame(frame);
 })();
 </script>
 </body>

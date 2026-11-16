@@ -45,7 +45,7 @@ def test_public_pages_reveal_no_findings(client, monkeypatch):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
     page = client.get("/login")
-    assert page.status_code == 200 and "SIGN IN TO K9X SENTINEL" in page.text and "/api/items" not in page.text
+    assert page.status_code == 200 and 'id="signin"' in page.text and "/api/items" not in page.text
     assert page.headers["cache-control"] == "no-store"
     about = client.get("/about")
     assert about.status_code == 200 and "another AI" in about.text
@@ -96,7 +96,7 @@ def test_sign_out_wins_over_remembered_browser_basic_credentials(client, monkeyp
     client.post("/api/login", json={"username": "admin", "password": "s3cret"})
     client.post("/api/logout")
     page = client.get("/", auth=("admin", "s3cret"))
-    assert "SIGN IN TO K9X SENTINEL" in page.text
+    assert 'id="signin"' in page.text
     assert client.get("/api/items", auth=("admin", "s3cret")).status_code == 401
     assert client.get("/api/items", auth=("admin", "s3cret"), headers=SCRIPT).status_code == 200
 
