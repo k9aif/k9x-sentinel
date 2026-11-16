@@ -397,3 +397,9 @@ def logo():
 @app.get("/architecture.svg")
 def architecture():
     return FileResponse(WEB / "architecture.svg", media_type="image/svg+xml")
+
+
+@app.get("/sentinel-watch.jpg")
+def watch_image():
+    """The landing page's hero image (public, like the logo)."""
+    return FileResponse(WEB / "sentinel-watch.jpg", media_type="image/jpeg")

@@ -92,9 +92,17 @@
           font: 500 12.5px var(--mono); color: var(--mute); }
   .live b { color: var(--ink); font-weight: 500; }
 
-  .scope { position: relative; aspect-ratio: 1; width: 100%; max-width: 480px; justify-self: center; }
-  canvas#scope { width: 100%; height: 100%; display: block; }
-  .legend { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font: 500 12px var(--mono); color: var(--mute); }
+  /* The hero image: its dark edges fade into the page, so it has no visible border */
+  .watch { margin: 0; justify-self: center; }
+  .watch img { display: block; height: min(640px, 76vh); width: auto; max-width: 100%;
+               mix-blend-mode: lighten;   /* the image's black takes the page's own colour; light stays */
+               -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 88%, transparent),
+                                   linear-gradient(180deg, transparent, #000 12%, #000 84%, transparent);
+               -webkit-mask-composite: source-in;
+                       mask-image: linear-gradient(90deg, transparent, #000 16%, #000 88%, transparent),
+                                   linear-gradient(180deg, transparent, #000 12%, #000 84%, transparent);
+                       mask-composite: intersect; }
+  .legend { display: flex; justify-content: center; gap: 16px; margin-top: -6px; font: 500 12px var(--mono); color: var(--mute); }
   .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; vertical-align: -1px; }
 
   /* Sections */
@@ -139,7 +147,7 @@
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; padding-top: 40px; }
-    .scope { max-width: 340px; }
+    .watch img { height: auto; width: min(360px, 100%); }
     .grid, .built { grid-template-columns: 1fr; }
     .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
@@ -190,10 +198,11 @@
         <span id="lv-src-wrap" hidden><b id="lv-src"></b> sources on watch</span>
       </div>
     </div>
-    <div>
-      <div class="scope"><canvas id="scope" aria-label="A watch light sweeping for new threats; each one is marked covered, partial or gap"></canvas></div>
-      <div class="legend"><span><i style="background:var(--covered)"></i>covered</span><span><i style="background:var(--partial)"></i>partial</span><span><i style="background:var(--gap)"></i>gap</span></div>
-    </div>
+    <figure class="watch">
+      <img src="/sentinel-watch.jpg" width="784" height="1168"
+           alt="A K9 sentinel with armored plates stands on a dark rock at night, its eyes casting a blue beam over drifting research pages; points of light below glow green, amber and red where threats are found">
+      <figcaption class="legend"><span><i style="background:var(--covered)"></i>covered</span><span><i style="background:var(--partial)"></i>partial</span><span><i style="background:var(--gap)"></i>gap</span></figcaption>
+    </figure>
   </div>
 
   <section id="watch">
@@ -350,73 +359,6 @@ fetch("/api/health").then(r => r.json()).then(h => {
   draw(); addEventListener("resize", draw);
 })();
 
-// ── The watch: a light sweeps the scope; threats appear and take their verdict as it passes ──
-(() => {
-  const c = document.getElementById("scope"), x = c.getContext("2d");
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const COL = {covered: "52,211,153", partial: "251,191,36", gap: "248,113,113"};
-  const pick = () => { const r = Math.random(); return r < 0.62 ? "covered" : r < 0.88 ? "partial" : "gap"; };
-  let W, R, dpr;
-  function size() { dpr = Math.min(devicePixelRatio || 1, 2); const b = c.getBoundingClientRect();
-                    W = c.width = c.height = Math.round(b.width * dpr); R = W / 2; }
-  size(); addEventListener("resize", size);
-  // threats: angle, distance (0..1), verdict, when first seen by the light
-  const blips = [];
-  function spawn(now) {
-    blips.push({a: Math.random() * Math.PI * 2, d: 0.22 + Math.random() * 0.72, v: pick(), seen: null, born: now});
-  }
-  for (let i = 0; i < 9; i++) spawn(-1e9);
-  const SPEED = 0.55;                            // radians per second: an unhurried watch
-  let last = 0, nextSpawn = 0;
-  function frame(ms) {
-    const t = ms / 1000, sweep = (t * SPEED) % (Math.PI * 2);
-    x.clearRect(0, 0, W, W);
-    x.save(); x.translate(R, R);
-    // scope face
-    const face = x.createRadialGradient(0, 0, 0, 0, 0, R);
-    face.addColorStop(0, "rgba(20,40,70,.55)"); face.addColorStop(1, "rgba(8,16,30,.85)");
-    x.fillStyle = face; x.beginPath(); x.arc(0, 0, R * 0.98, 0, Math.PI * 2); x.fill();
-    x.strokeStyle = "rgba(140,180,240,.14)"; x.lineWidth = 1 * dpr;
-    for (const k of [0.25, 0.5, 0.75, 0.98]) { x.beginPath(); x.arc(0, 0, R * k, 0, Math.PI * 2); x.stroke(); }
-    x.beginPath(); x.moveTo(-R * .98, 0); x.lineTo(R * .98, 0); x.moveTo(0, -R * .98); x.lineTo(0, R * .98); x.stroke();
-    // the beam: a soft wedge trailing the leading edge
-    for (let i = 0; i < 26; i++) {
-      const a0 = sweep - (i + 1) * 0.035, a1 = sweep - i * 0.035;
-      x.fillStyle = `rgba(191,227,255,${(0.16 * (1 - i / 26)).toFixed(3)})`;
-      x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R * 0.98, a0, a1); x.closePath(); x.fill();
-    }
-    x.strokeStyle = "rgba(220,240,255,.75)"; x.lineWidth = 1.4 * dpr;
-    x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(sweep) * R * .98, Math.sin(sweep) * R * .98); x.stroke();
-    // threats
-    for (const b of blips) {
-      const diff = ((sweep - b.a) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-      if (b.seen === null && diff < 0.08 && t - b.born / 1000 > 0.05) b.seen = t;
-      const px = Math.cos(b.a) * b.d * R * .96, py = Math.sin(b.a) * b.d * R * .96;
-      if (b.seen === null) {                       // not yet judged: a faint unknown
-        x.fillStyle = "rgba(200,215,240,.30)";
-        x.beginPath(); x.arc(px, py, 2.2 * dpr, 0, Math.PI * 2); x.fill();
-      } else {
-        const age = t - b.seen, a = Math.max(0, 1 - age / 9);
-        const rgb = COL[b.v];
-        x.fillStyle = `rgba(${rgb},${(0.95 * a).toFixed(3)})`;
-        x.beginPath(); x.arc(px, py, (b.v === "gap" ? 4.2 : 3.4) * dpr, 0, Math.PI * 2); x.fill();
-        if (age < 1.6) {                           // the moment of judgement: a ring opens
-          x.strokeStyle = `rgba(${rgb},${(0.7 * (1 - age / 1.6)).toFixed(3)})`; x.lineWidth = 1.2 * dpr;
-          x.beginPath(); x.arc(px, py, (4 + age * 14) * dpr, 0, Math.PI * 2); x.stroke();
-        }
-      }
-    }
-    x.restore();
-    for (let i = blips.length - 1; i >= 0; i--) if (blips[i].seen !== null && t - blips[i].seen > 9) blips.splice(i, 1);
-    if (t > nextSpawn) { spawn(ms); nextSpawn = t + 0.9 + Math.random() * 1.4; }
-    last = t;
-    if (!still) requestAnimationFrame(frame);
-  }
-  if (still) {                                     // reduced motion: one judged, still frame
-    for (const b of blips) b.seen = 0;
-    frame(400);
-  } else requestAnimationFrame(frame);
-})();
 </script>
 </body>
 </html>
