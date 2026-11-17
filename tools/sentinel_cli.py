@@ -16,6 +16,7 @@ Commands (add --json for machine-readable output):
     findings [--open|--all]    open = gaps / partial gaps raised or waiting (default)
     item <id>                  one finding with its assessment and audit trail
     hil                        HIL history (every case sent for review)
+    retry <id> [<id> ...]      a failed finding is assessed again on the next run
     run [--wait]               start a run; --wait follows it until it ends
     report <run_id> [--save F] the run's HTML report (to a file, or its path)
 
@@ -163,6 +164,13 @@ def cmd_run(wait: bool) -> None:
     print(f"Run #{last.get('id')} {last.get('status')} · {json.dumps((last.get('stats') or {}).get('assessed', {}))}")
 
 
+def cmd_retry(ids) -> None:
+    for item_id in ids:
+        out = _call("POST", f"/api/items/{item_id}/retry", {})
+        print(f"#{out['item_id']} queued: assessed again on the next run")
+    print("Start a run now with: run --wait")
+
+
 def cmd_report(run_id: int, save: Optional[str]) -> None:
     page = _call("GET", f"/api/runs/{run_id}/report.html", raw=True)
     path = Path(save or f"k9x-sentinel-run-{run_id}.html").expanduser()
@@ -185,6 +193,8 @@ def main(argv) -> None:
         cmd_item(int(args[1].lstrip("#")), as_json)
     elif cmd == "hil":
         cmd_hil(as_json)
+    elif cmd == "retry" and len(args) > 1:
+        cmd_retry([int(a.lstrip("#")) for a in args[1:]])
     elif cmd == "run":
         cmd_run("--wait" in args)
     elif cmd == "report" and len(args) > 1:

@@ -29,7 +29,8 @@ from sentinel.agents.action_agents import DecisionAgent
 from sentinel.agents.assess_agents import ContentScreenAgent, GapAnalysisAgent, PrefilterAgent, TriageAgent
 from sentinel.agents.collect_agents import DependencyAuditAgent, FeedCollectorAgent
 from sentinel.agents.common import agent_config
-from sentinel.settings import hil_detail
+from sentinel.agents.assess_agents import hil_context
+from sentinel.settings import hil_detail, public_url, severity_at_least
 
 log = logging.getLogger(__name__)
 
@@ -88,7 +89,9 @@ class AssessOrchestrator(_SentinelOrchestrator):
         except RequiresHIL as exc:
             return self._raise_to_hil(exc, payload, item_id)
         except Exception as exc:
-            return self._failed(item_id, exc)
+            out = self._failed(item_id, exc)
+            escalation = self._failure_case(item_id, exc) if out["status"] == "failed" else None
+            return self._raise_to_hil(escalation, payload, item_id) if escalation else out
         return {"status": "assessed", "item_id": item_id, **(result.get("triage") or {})}
 
     def _raise_to_hil(self, exc: RequiresHIL, payload: Dict[str, Any], item_id: int) -> Dict[str, Any]:
@@ -109,6 +112,21 @@ class AssessOrchestrator(_SentinelOrchestrator):
         activity.emit("hil", f"Published to k9x-hil · {out.get('reply_to', '').replace('replies', 'requests')}", "ok",
                       item=item_id)
         return {**out, "item_id": item_id}
+
+    def _failure_case(self, item_id: int, exc: Exception) -> Optional[RequiresHIL]:
+        """A finding assessed at high or critical severity that then failed must not end as a "failed" row nobody
+        reads: it goes to a reviewer as a failure, with the assessment it reached."""
+        item = store.get_item(item_id) or {}
+        a = item.get("assessment") or {}
+        if not a or a.get("verdict") not in ("gap", "partial") or not severity_at_least(a.get("severity", "low"), "high"):
+            return None
+        cfg = self.config.get("sentinel", {})
+        reason = (f"K9X Sentinel finding #{item_id}: assessed as {a['verdict']}, {a['severity']} severity, but "
+                  f"processing failed after {MAX_ATTEMPTS} attempts ({exc.__class__.__name__}). "
+                  f"Review: {public_url()}/#item-{item_id}")
+        store.audit("failure_raised", item_id, severity=a["severity"], error=f"{exc.__class__.__name__}: {exc}"[:300])
+        return RequiresHIL(reason=reason[:480], context=hil_context(item, a, hil_detail()),
+                           priority=a["severity"], queue=cfg.get("hil", {}).get("queue", "framework_security_updates"))
 
     @staticmethod
     def _failed(item_id: int, exc: Exception) -> Dict[str, Any]:

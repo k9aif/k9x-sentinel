@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from sentinel import api, runner
+from sentinel import api, runner, store
 
 
 SCRIPT = {"X-Sentinel-Client": "test"}
@@ -248,3 +248,15 @@ def test_run_report_html_admin_full_demo_redacted(client, demo_on, monkeypatch):
     demo = client.get(f"/api/runs/{run['run_id']}/report.html").text
     assert "Secret technique R" not in demo and "under private review" in demo
     assert "Screen MCP tool metadata" not in demo              # the suggested fix stays private too
+
+
+def test_retry_endpoint_is_admin_only_and_audited(client, monkeypatch):
+    monkeypatch.setenv("SENTINEL_PASSWORD", "s3cret")
+    item_id = store.add_item({"uid": "t:retry", "source": "osv", "kind": "article", "title": "x", "link": "", "content": "x"})
+    store.update_item(item_id, status="failed")
+    assert client.post(f"/api/items/{item_id}/retry").status_code == 401
+    client.post("/api/login", json={"username": "admin", "password": "s3cret"})
+    r = client.post(f"/api/items/{item_id}/retry")
+    assert r.status_code == 200 and store.get_item(item_id)["status"] == "new"
+    assert client.post(f"/api/items/{item_id}/retry").status_code == 409          # only failed/error items
+    assert "retry_requested" in [e["event"] for e in store.item_audit(item_id)]

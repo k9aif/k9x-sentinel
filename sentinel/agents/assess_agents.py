@@ -28,7 +28,7 @@ from k9_aif_abb.k9_security.tool_result_guard import screen_tool_result
 from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
 
 from sentinel import activity, catalog, dedup, sources, store
-from sentinel.agents.common import SentinelAgent
+from sentinel.agents.common import SentinelAgent, labelled_content_governance
 from sentinel.settings import SEVERITIES, hil_detail, public_url, severity_at_least
 
 VERDICTS = ["covered", "partial", "gap", "not_relevant"]
@@ -227,7 +227,9 @@ def dependency_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class GapAnalysisAgent(SentinelAgent):
-    """Egress is k9x Shield only, deliberately. Granite Guardian classifies
+    """Ingress: the article was screened and labelled by ContentScreenAgent, so the injection check doesn't block
+    it again here (``labelled_content_governance``); without that, every write-up that quotes its attack failed.
+    Egress is k9x Shield only, deliberately. Granite Guardian classifies
     harmful content, and an accurate analysis of a jailbreak or injection
     technique reads as harmful to it (verified live: it blocked every
     relevant assessment). The real egress risks here are markup reaching the
@@ -237,7 +239,7 @@ class GapAnalysisAgent(SentinelAgent):
     layer = "K9X Sentinel GapAnalysisAgent SBB"
 
     def __init__(self, config: Optional[Dict[str, Any]] = None, monitor=None, **kwargs):
-        kwargs.setdefault("governance", ShieldGovernance(config=config or {}))
+        kwargs.setdefault("governance", labelled_content_governance(config or {}))
         super().__init__(config=config, monitor=monitor, **kwargs)
 
     def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -320,7 +322,18 @@ def hil_context(item: Dict[str, Any], a: Dict[str, Any], detail: str) -> Dict[st
 
 
 class TriageAgent(SentinelAgent):
+    """Deterministic: thresholds, de-duplication, the hand-over to k9x-hil. No model call, no tools.
+
+    Its input is the assessment alone (AssessSquad scopes it with ``context_keys``), and it is governed by k9x
+    Shield only, like GapAnalysisAgent: an accurate assessment of an attack reads as harmful to Granite Guardian
+    and names the attack in words Shield's injection check matches (``labelled_content_governance``), which made
+    the most severe findings fail instead of reaching a reviewer."""
+
     layer = "K9X Sentinel TriageAgent SBB"
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None, monitor=None, **kwargs):
+        kwargs.setdefault("governance", labelled_content_governance(config or {}))
+        super().__init__(config=config, monitor=monitor, **kwargs)
 
     def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         self.enforce_governance()

@@ -40,6 +40,23 @@ def build_governance(config: Dict[str, Any]) -> ChainedGovernance:
     return ChainedGovernance(ShieldGovernance(config=config), GuardianGovernance(config=config), config=config)
 
 
+# Checks that read attack write-ups as attacks. ContentScreenAgent already runs them (Shield + Guardian) on every
+# article and records the label; an agent that analyses the labelled text must not be blocked by them again.
+LABELLED_CONTENT_EXEMPT = ("PromptInjectionCheck",)
+
+
+def labelled_content_governance(config: Dict[str, Any]) -> ShieldGovernance:
+    """k9x Shield for an agent that reads content ContentScreenAgent has screened and labelled (an article, or the
+    assessment of one): every configured check except the injection check on the way in, all checks on the way
+    out. The injection check would block the attack an article describes ("exfiltrate", "ignore previous
+    instructions"), and with it the most severe findings, which is what Sentinel exists to surface."""
+    import copy
+    cfg = copy.deepcopy(config or {})
+    ingress = (((cfg.setdefault("security", {}).setdefault("shield", {})).setdefault("ingress", {})))
+    ingress["checks"] = [c for c in ingress.get("checks") or [] if c not in LABELLED_CONTENT_EXEMPT]
+    return ShieldGovernance(config=cfg)
+
+
 class SentinelAgent(BaseAgent):
     layer = "K9X Sentinel Agent SBB"
 

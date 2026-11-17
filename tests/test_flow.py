@@ -320,3 +320,66 @@ def test_admin_stop_ends_the_run_after_the_current_item(shield_only, model, monk
     assert store.get_item(second)["status"] == "new"             # untouched, next run
     assert store.last_runs(1)[0]["status"] == "stopped"
     assert not activity.stop_requested()                          # cleaned up for the next run
+
+
+# ── 2026-11: the most severe findings must reach a person ─────────────────────────────────────────────────────────
+
+def test_attack_writeup_that_names_exfiltration_reaches_review(shield_only, model):
+    """Property: an article describing an attack, and an assessment that names it, still reach review. Live
+    findings #1775, #2519 and #3293 (critical/high) failed instead: the injection check blocked the words
+    describing the attack ("exfiltrate") at the analysis and triage steps."""
+    model[1][0] = answer(severity="critical", rationale="Agents can be induced to exfiltrate data through tool output.")
+    bus = FakeBus()
+    item_id = article("The attacker used the agent to exfiltrate credentials to a remote server.")
+    out = build(bus).route({"event_type": "sentinel.assess", "item_id": item_id})
+    assert out["status"] == "pending_hil"
+    assert bus.sent[0][1]["priority"] == "critical"
+
+
+def _break_triage(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("triage broke")
+    monkeypatch.setattr(assess_agents.dedup, "find_duplicate", boom)
+
+
+def test_high_severity_assessment_that_then_fails_is_raised_as_a_failure(shield_only, model, monkeypatch):
+    """Property: when a finding was assessed high or critical but processing then fails for good, a reviewer gets a
+    case saying so; it never ends as a "failed" row nobody reads."""
+    _break_triage(monkeypatch)
+    bus = FakeBus()
+    router = build(bus)
+    item_id = article()
+    assert [router.route({"event_type": "sentinel.assess", "item_id": item_id})["status"] for _ in range(2)] == \
+        ["error", "error"]
+    assert not bus.sent
+    out = router.route({"event_type": "sentinel.assess", "item_id": item_id})
+    assert out["status"] == "pending_hil"
+    topic, msg = bus.sent[0]
+    assert topic == "hil.requests.framework_security_updates" and msg["priority"] == "high"
+    assert "processing failed" in msg["title"] or "processing failed" in json.dumps(msg)
+    assert "failure_raised" in [e["event"] for e in store.item_audit(item_id)]
+
+
+def test_medium_severity_failure_is_recorded_not_raised(shield_only, model, monkeypatch):
+    model[1][0] = answer(severity="medium")
+    _break_triage(monkeypatch)
+    bus = FakeBus()
+    router = build(bus)
+    item_id = article()
+    assert [router.route({"event_type": "sentinel.assess", "item_id": item_id})["status"] for _ in range(3)] == \
+        ["error", "error", "failed"]
+    assert not bus.sent
+
+
+def test_retry_resets_only_failed_findings(shield_only, model, monkeypatch):
+    _break_triage(monkeypatch)
+    model[1][0] = answer(severity="medium")      # raised path, below the escalation floor: ends "failed"
+    router = build(FakeBus())
+    item_id = article()
+    for _ in range(3):
+        router.route({"event_type": "sentinel.assess", "item_id": item_id})
+    assert store.get_item(item_id)["status"] == "failed"
+    assert store.retry_failed(item_id) is True
+    it = store.get_item(item_id)
+    assert it["status"] == "new" and "attempts" not in (it["data"] or {}) and it["error"] is None
+    assert store.retry_failed(item_id) is False          # new, not failed: nothing to retry

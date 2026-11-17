@@ -20,6 +20,12 @@ become a GitHub draft advisory or issue (dry_run by default).
   Attack write-ups contain injection text by nature; withholding them blinds
   Sentinel. Containment is: no tools, JSON-only answer, `validate()` against
   the catalog, human review.
+- **Agents that read screened content are not blocked by the injection check again**
+  (`labelled_content_governance`: GapAnalysisAgent reads the labelled article, TriageAgent only the
+  assessment, via `context_keys`). Attack write-ups name their attack ("exfiltrate"); before 2026-11-16 that
+  failed the most severe findings (#1775, #2519, #3293) without reaching anyone. Tests in test_flow.py.
+- **A high or critical finding that fails for good is raised to HIL as a failure**
+  (`AssessOrchestrator._failure_case`); `sentinel_cli.py retry <id>` re-queues a failed finding after a fix.
 - **GapAnalysisAgent's egress is Shield only.** Guardian blocks accurate
   attack analyses as harmful (verified live 2026-10-01). Don't "fix" this by
   adding Guardian back; there's a test pinning it.

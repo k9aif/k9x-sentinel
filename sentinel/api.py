@@ -316,6 +316,15 @@ def requeue(body: Requeue, request: Request, user: str = Depends(admin)):
     return {"requeued": n, "days": days}
 
 
+@app.post("/api/items/{item_id}/retry")
+def retry_item(item_id: int, request: Request, user: str = Depends(admin)):
+    """A failed finding goes through assessment again on the next run (for example after a fix)."""
+    if not store.retry_failed(item_id):
+        raise HTTPException(409, "only a failed or errored finding can be retried")
+    store.audit("retry_requested", item_id, actor=user, address=_client(request))
+    return {"item_id": item_id, "status": "new"}
+
+
 class RunRequest(BaseModel):
     sources: List[str] = []
 

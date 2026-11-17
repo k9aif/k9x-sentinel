@@ -30,6 +30,10 @@ squads:
       - agent: TriageAgent
         result_key: triage
         when: {key: prefilter.relevant, eq: true}
+        # Only the assessment (it already passed Shield at GapAnalysisAgent's egress), never the article: an
+        # attack write-up names the attack ("exfiltrate", "ignore previous instructions") and blocked triage,
+        # so the most dangerous findings failed without reaching a person (#1775, #2519, #3293, 2026-11).
+        context_keys: [assessment]
 
   RetriageSquad:
     description: Re-send an already assessed finding (Kafka was down) without assessing it again.

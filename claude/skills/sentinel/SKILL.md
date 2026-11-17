@@ -20,6 +20,8 @@ Paths:
 - `run` → `sentinel_cli.py run --wait` first (shows progress), then analyse
 - a number (`74` or `#74`) → analyse only that finding
 - `status` → only show `sentinel_cli.py status` and `findings`, no analysis
+- `retry <id> [<id> ...]` → `sentinel_cli.py retry <ids>` (a failed finding is assessed again), then
+  `run --wait`, then analyse those findings. Use it after a fix, never to re-send a decided finding
 
 ## Steps
 

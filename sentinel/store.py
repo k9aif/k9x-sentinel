@@ -337,6 +337,17 @@ def requeue_baseline(days: float, now: Optional[float] = None) -> int:
         return res.rowcount or 0
 
 
+def retry_failed(item_id: int) -> bool:
+    """A failed item is assessed again on the next run: status new, attempt count cleared. Only ``failed`` and
+    ``error`` items qualify, so a decided or pending finding can't be re-sent by mistake."""
+    item = get_item(item_id)
+    if not item or item.get("status") not in ("failed", "error"):
+        return False
+    data = {k: v for k, v in (item.get("data") or {}).items() if k != "attempts"}
+    update_item(item_id, status="new", data=data, error=None)
+    return True
+
+
 def ids_with_status(statuses: Iterable[str]) -> List[int]:
     t = _t("items")
     with _engine().connect() as con:
