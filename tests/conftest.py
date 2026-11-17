@@ -17,6 +17,10 @@ os.environ["SENTINEL_DB"] = "sqlite"            # never the real database
 os.environ["KAFKA_BROKER"] = ""
 os.environ["SENTINEL_GITHUB_MODE"] = "dry_run"
 os.environ["SENTINEL_GITHUB_TOKEN"] = ""
+# Jira likewise: a developer's .env with live Jira settings must never create real tickets from a test run.
+os.environ["SENTINEL_JIRA_MODE"] = "dry_run"
+for _k in ("URL", "EMAIL", "TOKEN", "PROJECT", "ASSIGNEE"):
+    os.environ[f"SENTINEL_JIRA_{_k}"] = ""
 os.environ["SENTINEL_HIL_DETAIL"] = "minimal"
 os.environ["SENTINEL_HIL_APPROVERS"] = ""
 os.environ["SENTINEL_PASSWORD"] = ""
@@ -47,3 +51,14 @@ def shield_only(monkeypatch):
     from k9_aif_abb.k9_security.vulnerability.shield_governance import ShieldGovernance
     from sentinel.agents import common
     monkeypatch.setattr(common, "build_governance", lambda cfg: ShieldGovernance(config=cfg))
+
+
+@pytest.fixture(autouse=True)
+def no_real_http_integrations(monkeypatch):
+    """No test reaches a real external system through the framework's HttpApiAdapter (Jira): a test that
+    exercises one replaces the endpoint call itself, after this guard."""
+    from k9_aif_abb.k9_adapters.integration.http_api_adapter import HttpApiAdapter
+
+    def refuse(self, url, method, headers, body):
+        raise AssertionError(f"test tried a real HTTP integration call: {method} {url}")
+    monkeypatch.setattr(HttpApiAdapter, "call_endpoint", refuse)
