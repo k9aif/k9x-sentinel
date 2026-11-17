@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sentinel import activity, store
+from sentinel import activity, jira_tickets, store
 from sentinel.orchestrators.sentinel_orchestrators import assess_queue
 from sentinel.router.sentinel_router import get_router
 from sentinel.settings import run_at
@@ -84,6 +84,11 @@ def run_once(sources: Optional[List[str]] = None) -> Dict[str, Any]:
         if stopped:
             store.finish_run(run_id, "stopped", {**stats, "reason": "model backend unavailable"})
             return {"status": "stopped", "run_id": run_id, **stats}
+        try:   # the work items: read each approved finding's Jira status back
+            stats["tickets"] = jira_tickets.sync()
+        except Exception as exc:          # a ticket check must not fail the run; recorded with the run
+            log.warning("[Sentinel] Jira status check failed: %s", exc)
+            stats["tickets"] = {"error": f"{exc.__class__.__name__}: {exc}"[:200]}
         store.finish_run(run_id, "completed", stats)
         activity.emit("run", "Run #%d completed · %s" % (run_id, ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in outcomes.items()) or "nothing new"), "ok")
         log.info("[Sentinel] run %d completed: %s", run_id, stats)

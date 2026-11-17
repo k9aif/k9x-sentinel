@@ -135,6 +135,19 @@ def github() -> Dict[str, str]:
             "token": os.environ.get("SENTINEL_GITHUB_TOKEN", "").strip()}
 
 
+def jira() -> Dict[str, str]:
+    """The Jira ticket an approved finding becomes (sentinel/jira_tickets.py). dry_run unless
+    SENTINEL_JIRA_MODE=live and the URL, account email, API token and project key are set."""
+    mode = os.environ.get("SENTINEL_JIRA_MODE", "dry_run").strip().lower()
+    return {"mode": "live" if mode == "live" else "dry_run",
+            "url": os.environ.get("SENTINEL_JIRA_URL", "").strip().rstrip("/"),
+            "email": os.environ.get("SENTINEL_JIRA_EMAIL", "").strip(),
+            "token": os.environ.get("SENTINEL_JIRA_TOKEN", "").strip(),
+            "project": os.environ.get("SENTINEL_JIRA_PROJECT", "").strip(),
+            "issue_type": os.environ.get("SENTINEL_JIRA_ISSUE_TYPE", "Task").strip() or "Task",
+            "assignee": os.environ.get("SENTINEL_JIRA_ASSIGNEE", "").strip()}
+
+
 def catalog_path() -> str:
     return os.environ.get("SENTINEL_CATALOG_PATH", "").strip()
 

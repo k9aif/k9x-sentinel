@@ -3,13 +3,14 @@
 """DecisionSquad agent: act on a reviewer's decision from k9x-hil.
 
 k9x-hil publishes only terminal decisions: complete (approved), reject,
-expire. Only an approval reaches GitHub; Sentinel never changes code."""
+expire. An approval becomes a Jira ticket assigned to the owner (the work item)
+and a GitHub draft advisory or issue; Sentinel never changes code."""
 
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from sentinel import activity, github_actions, store
+from sentinel import activity, github_actions, jira_tickets, store
 from sentinel.agents.common import SentinelAgent
 from sentinel.settings import hil_approvers
 
@@ -38,18 +39,24 @@ class DecisionAgent(SentinelAgent):
             store.update_item(item["id"], status="hil_failed", decision=record,
                               error=f"decision by {actor or 'unknown'} ignored (not in SENTINEL_HIL_APPROVERS); re-raised next run")
             return {"outcome": "ignored_unauthorized", "action": None}
-        action = None
+        action, ticket = None, None
         if outcome == "approved":
             version = (item.get("assessment") or {}).get("framework_version") or "unknown"
+            ticket = jira_tickets.create(item, version)
             action = github_actions.perform(item, version)
-        store.update_item(item["id"], status="decided", decision=record, action=action)
+        data = {**(item.get("data") or {}), **({"jira": ticket} if ticket else {})}
+        store.update_item(item["id"], status="decided", decision=record, action=action, data=data)
         store.audit("decision_received", item["id"], actor=decision.get("actor") or "unknown", outcome=outcome,
                     comment=decision.get("comment"), decided_at=decision.get("decided_at"),
                     correlation_id=decision.get("correlation_id"))
+        if ticket:
+            store.audit("jira_ticket", item["id"], mode=ticket.get("mode"), ok=ticket.get("ok"), key=ticket.get("key"),
+                        url=ticket.get("url"), assignee=ticket.get("assignee"), error=ticket.get("error"))
         if action:
             store.audit("github_action", item["id"], mode=action.get("mode"), kind=action.get("kind"),
                         ok=action.get("ok"), url=action.get("url"), error=action.get("error"),
                         request_url=(action.get("request") or {}).get("url"))
         activity.emit("decision", f"#{item['id']} {outcome} by {decision.get('actor') or '?'}"
+                      + (f" → Jira {ticket.get('key') or ticket['mode']}" if ticket else "")
                       + (f" → GitHub {action['kind']} ({action['mode']})" if action else ""), "ok", item=item["id"])
-        return {"outcome": outcome, "action": action}
+        return {"outcome": outcome, "action": action, "jira": ticket}

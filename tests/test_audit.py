@@ -67,7 +67,8 @@ def test_full_round_trip_is_in_the_audit_trail(shield_only, model):
     asyncio.run(router._on_hil_reply({"correlation_id": out["correlation_id"], "action": "complete",
                                       "actor": "ravinatarajan@k9x.ai", "comment": "ship a check"}))
     events = [e["event"] for e in store.item_audit(out["item_id"])]
-    assert events == ["item_collected", "screened", "assessed", "raised_to_hil", "decision_received", "github_action"]
+    assert events == ["item_collected", "screened", "assessed", "raised_to_hil", "decision_received", "jira_ticket",
+                      "github_action"]
     assessed = store.item_audit(out["item_id"])[2]["detail"]
     assert assessed["model"] and assessed["framework_version"] and len(assessed["text_sha256"]) == 64
     assert store.verify_chain()["ok"]

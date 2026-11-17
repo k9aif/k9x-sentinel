@@ -329,6 +329,7 @@ async function showItem(id) {
       <dt>Assessed against</dt><dd>${esc(a.framework_version ? "k9-aif " + a.framework_version : "—")} <span class="note">${esc(a.catalog_origin || "")}</span></dd>
       <dt>HIL case</dt><dd>${esc(it.correlation_id || "—")}</dd>
       <dt>Decision</dt><dd>${d ? esc(`${d.outcome} by ${d.actor || "?"}${d.comment ? ": " + d.comment : ""}`) : "—"}</dd>
+      <dt>Jira</dt><dd>${(it.data || {}).jira ? ((j => j.url ? `<a href="${esc(j.url)}" target="_blank" rel="noopener noreferrer">${esc(j.key)}</a> · ${esc(j.status || "")}${j.done ? " · done" : ""}` : `${esc(j.mode)}${j.error ? " · " + esc(j.error) : ""}`)((it.data || {}).jira)) : "—"}</dd>
       <dt>GitHub</dt><dd>${act ? (act.url ? `<a href="${esc(act.url)}" target="_blank" rel="noopener noreferrer">${esc(act.kind)}</a>` : `${esc(act.mode)} · ${esc(act.kind)}${act.error ? " · " + esc(act.error) : ""}`) : "—"}</dd>
       <dt>Error</dt><dd>${esc(it.error || "—")}</dd>
     </dl>
@@ -370,7 +371,8 @@ const EVENT_LABEL = {item_collected: "Collected", screened: "Screened", assessed
   prefiltered: "Not relevant (pre-filter, no model call)", duplicate_not_raised: "Duplicate, not raised",
   raised_to_hil: "Raised to human review",
   hil_unsent: "Not sent (Kafka unavailable)", decision_received: "Decision received",
-  decision_ignored_unauthorized: "Decision ignored (not an approver)", github_action: "GitHub", assessment_failed: "Assessment failed"};
+  decision_ignored_unauthorized: "Decision ignored (not an approver)", github_action: "GitHub", assessment_failed: "Assessment failed",
+  jira_ticket: "Jira ticket", jira_status: "Jira status", failure_raised: "Raised as a failure", retry_requested: "Retry requested"};
 const fmt = ts => ts ? new Date(ts * 1000).toLocaleString() : "—";
 function eventDetail(e) {
   const d = e.detail || {};

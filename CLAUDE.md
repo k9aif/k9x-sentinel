@@ -26,6 +26,9 @@ become a GitHub draft advisory or issue (dry_run by default).
   failed the most severe findings (#1775, #2519, #3293) without reaching anyone. Tests in test_flow.py.
 - **A high or critical finding that fails for good is raised to HIL as a failure**
   (`AssessOrchestrator._failure_case`); `sentinel_cli.py retry <id>` re-queues a failed finding after a fix.
+- **An approval is a Jira ticket assigned to the owner** (`jira_tickets.py`, through the framework's
+  `HttpApiAdapter`, Jira host only): the finding, suggested fix and definition of done. Each run reads the
+  ticket's status back (`jira_tickets.sync()`). dry_run until `SENTINEL_JIRA_*` are set.
 - **GapAnalysisAgent's egress is Shield only.** Guardian blocks accurate
   attack analyses as harmful (verified live 2026-10-01). Don't "fix" this by
   adding Guardian back; there's a test pinning it.
